@@ -2,7 +2,7 @@
 #include <adf.h>
 #include "graph.h"
 
-#define ITERATIONS 4
+#define ITERATIONS 1
 
 using namespace adf;
 
