@@ -2,7 +2,7 @@
 #include <adf.h>
 #include "graph_window_passthrough.h"
 
-#define NUM_INPUTS 1
+#define NUM_INPUTS 8
 #define NUM_GRAPHS 1
 
 #define WINDOW_SIZE 1024

@@ -18,8 +18,8 @@ PLATFORM := /home/s2716879/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_
 WORKSPACE := PLF
 VERSION := PLFv1
 
-PL := uint32
-AIE := stream32v1
+PL := uint128
+AIE := 128x1PLF
 
 PL_FREQ := 300
 AIE_FREQ := 300

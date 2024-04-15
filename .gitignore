@@ -1,0 +1,59 @@
+# Ignore build output directory
+build/
+_x/
+.Xil/
+
+# Ignore object files and dependent files
+*.o
+*.d
+*.xo
+
+#Ignore logs folder and log files
+logs/
+*.log
+*.jou
+
+#Ignore lock files
+*.lock
+*.swp
+
+#Ignore simulation/emulation data
+emulation/
+.run/
+*.wdb
+*.wcfg
+*.protoinst
+x86simulator_output/
+.AIE_SIM_CMD_LINE_OPTIONS
+*.run_summary
+tmp.vcd.vcd
+pl_sample_counts
+trdata.aiesim/
+
+#Ignore profiling data
+*.csv
+
+#Ignore vitis files
+.repo.yaml
+.metadata/
+.peers.ini
+.analyzer_session.json
+.analytics
+aiecompiler.cfg
+vitis-*.json
+compile_commands.json
+CMakeLists.txt
+*.cmake
+*_xrt.ini
+.theia/
+_ide/
+package/
+binary_container_*.cfg
+.ipcache/
+sol.db
+
+.exe
+.bin
+.pdi
+
+.cache/
