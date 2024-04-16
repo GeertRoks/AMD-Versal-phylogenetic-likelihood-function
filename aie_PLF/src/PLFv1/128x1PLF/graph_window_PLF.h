@@ -13,12 +13,18 @@ public:
     for (unsigned int i = 0; i < num_inputs; i++) {
       //k_mmul_left[i] = adf::kernel::create(mmul_branch<window_data_size>);
       //source(k_mmul_left[i]) = "kernels/mmul_branch.cpp";
-      k_mul[i] = adf::kernel::create(mul<window_data_size>);
-      source(k_mul[i]) = "kernels/mul.cpp";
+      //k_mul[i] = adf::kernel::create(mul<window_data_size>);
+      //source(k_mul[i]) = "kernels/mul.cpp";
+      k_mac_ev[i] = adf::kernel::create(mac_ev<window_data_size>);
+      source(k_mac_ev[i]) = "kernels/mac_ev.cpp";
 
-      adf::connect<adf::window<window_data_size>>(data_in0[i], k_mul[i].in[0]);
-      adf::connect<adf::window<window_data_size>>(data_in1[i], k_mul[i].in[1]);
-      adf::connect<adf::window<window_data_size>>(k_mul[i].out[0], data_out[i]);
+      adf::connect<adf::window<window_data_size>>(data_in0[i], k_mac_ev[i].in[0]);
+      adf::connect<adf::window<window_branch_size>>(data_in1[i], k_mac_ev[i].in[1]);
+      adf::connect<adf::window<window_data_size>>(k_mac_ev[i].out[0], data_out[i]);
+
+      //adf::connect<adf::window<window_data_size>>(data_in0[i], k_mul[i].in[0]);
+      //adf::connect<adf::window<window_data_size>>(data_in1[i], k_mul[i].in[1]);
+      //adf::connect<adf::window<window_data_size>>(k_mul[i].out[0], data_out[i]);
 
       //adf::connect<adf::window<window_data_size>>(data_in0[i], k_mmul_left[i].in[0]);
       //adf::connect<adf::window<window_branch_size>>(data_in1[i], k_mmul_left[i].in[1]);
@@ -34,11 +40,13 @@ public:
       //};
 
       //adf::runtime<ratio>(k_mmul_left[i]) = 1;
-      adf::runtime<ratio>(k_mul[i]) = 1;
+      //adf::runtime<ratio>(k_mul[i]) = 1;
+      adf::runtime<ratio>(k_mac_ev[i]) = 1;
     }
   }
 
 private:
   //adf::kernel k_mmul_left[num_inputs];
-  adf::kernel k_mul[num_inputs];
+  //adf::kernel k_mul[num_inputs];
+  adf::kernel k_mac_ev[num_inputs];
 };

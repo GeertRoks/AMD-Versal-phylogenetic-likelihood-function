@@ -6,7 +6,7 @@
 #define NUM_GRAPHS 1
 
 #define WINDOW_DATA_SIZE 256
-#define WINDOW_BRANCH_SIZE 1024
+#define WINDOW_BRANCH_SIZE 64
 
 class PlioPLFGraph : public adf::graph {
 public:
@@ -26,7 +26,7 @@ public:
       plio_out[i] = adf::output_plio::create(plio_name("out", i), adf::plio_128_bits, data_name("output", i));
 
       adf::connect<adf::stream, adf::window<WINDOW_DATA_SIZE>>(plio_in0[i].out[0], graphs[0].data_in0[i]);
-      adf::connect<adf::stream, adf::window<WINDOW_DATA_SIZE>>(plio_in1[i].out[0], graphs[0].data_in1[i]);
+      adf::connect<adf::stream, adf::window<WINDOW_BRANCH_SIZE>>(plio_in1[i].out[0], graphs[0].data_in1[i]);
       adf::connect<adf::window<WINDOW_DATA_SIZE>, adf::stream>(graphs[0].data_out[i], plio_out[i].in[0]);
     }
   };
