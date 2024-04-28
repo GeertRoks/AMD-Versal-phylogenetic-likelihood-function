@@ -16,9 +16,9 @@ void mmul_branch(input_window<float>* in_data, input_window<float>* in_branch_ma
   aie::vector<float, 16> branch;
   aie::vector<float, 4> data;
 
+  branch = window_readincr_v<16>(in_branch_matrix);
   for (uint16_t i=0; i<blocks; i++) {
 
-    branch = window_readincr_v<16>(in_branch_matrix);
     data = window_readincr_v<4>(in_data);
 
     MMUL matrix_mul;

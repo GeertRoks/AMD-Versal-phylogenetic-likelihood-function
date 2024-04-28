@@ -48,14 +48,20 @@ HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2s_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2
 XSA := $(DIR_BUILD)/$(TARGET)/sys/$(WORKSPACE)_$(PL)_$(AIE).xsa
 XCLBIN := $(DIR_BUILD)/$(TARGET)/$(WORKSPACE)_$(PL)_$(AIE).xclbin
 
+
 define VPP_CONNECTION_FLAGS
---connectivity.nk mm2s:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2s_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
-$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2s_$$i.s0:ai_engine_0.plio_data_in$$i"; done | sed 's/,$$//') \
-$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc ai_engine_0.plio_data_out$$i:s2mm_$$i.s0"; done | sed 's/,$$//')
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sleft_$$i.s$$j:ai_engine_0.plio_in_$${i}_0_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sright_$$i.s$$j:ai_engine_0.plio_in_$${i}_1_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc ai_engine_0.plio_out_$${i}_$${j}:s2mm_$$i.s$$j"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sBranch:ai_engine_0.plio_in_branch_$${i}_0"; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sright_$$i.sBranch:ai_engine_0.plio_in_branch_$${i}_1"; done)
 endef
 
-HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2s_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
+HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
 VPP_LINK_DEPS := $(AIE_LIBADF) $(HLS_XO)
 VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
 
@@ -68,7 +74,6 @@ VPP_INTERMEDIATE_FILE_DIRS := --save-temps --temp_dir $(DIR_BUILD)/$(TARGET)/_x_
 #VPP_LINK_CLOCK_FLAGS := --clock.freqHz $(PL_FREQ)000000:mm2s_0,s2mm_0 --clock.freqHz $(AIE_FREQ)000000:ai_engine_0
 VPP_LINK_CLOCK_FLAGS := --kernel_frequency 0:$(PL_FREQ)
 VPP_HLS_FLAGS := --hls.jobs 8
-VPP_HLS_FLAGS += --hls.clock $(PL_FREQ)000000:mm2s,s2mm
 VPP_AIE_FLAGS := --pl-freq=$(PL_FREQ)
 
 GCC_HOST_FLAGS := -g -Wall -std=c++17 -DAIE=$(AIE) -DPL=$(PL) -DPL_FREQ=$(PL_FREQ)
@@ -146,7 +151,7 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 
 #####################################################################################################
 
-$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp
+$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)/src/plf.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
@@ -174,7 +179,7 @@ $(XSA): $(VPP_LINK_DEPS)
 
 $(DIR_BUILD)/$(TARGET)/hls/%.xo: $(DIR_HLS)/src/%.cpp
 	$(dir_guard)
-	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
+	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) --hls.clock $(PL_FREQ)000000:$(firstword $(subst _, ,$*)) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
 
 %emconfig.json:
 	emconfigutil --platform $(PLATFORM) --nd 1 --od $(@D)

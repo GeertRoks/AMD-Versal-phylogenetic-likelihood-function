@@ -27,28 +27,31 @@ extern "C" {
 #pragma HLS interface s_axilite port=return bundle=control
 
     const unsigned int iterations = (size>>4);
+    ap_uint<512> buffer = 0;
     hls::stream<ap_axiu<128,0,0,0>>* s[] = {&s0, &s1, &s2, &s3};
     ap_axiu<128,0,0,0> x;
 
-    // fill branch matrix (64 elem * 32 = 2048 bits / 128 bits = 16)
-    // and EV matrix (16 elem * 32 = 512 bits / 128 bits = 4)
-    ap_uint<128>* mem_128 = reinterpret_cast<ap_uint<128>*>(&mem[0]);
-    for(unsigned int i = 0; i < 16; i++) {
-      x.data = mem_128 + i;
-      sBranch.write(x);
+    // fill branch matrix (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
+    for(unsigned int i = 0; i < 4; i++) {
+      buffer = mem[i];
+      for(unsigned int j = 0; j < 4; j++) {
+        x.data = buffer.range(127 + j*128, j*128);
+        sBranch.write(x);
+      }
     }
 
-    mem_128 = reinterpret_cast<ap_uint<128>*>(&mem[4]);
-    for(unsigned int i = 0; i < 4; i++) {
-      x.data = mem_128 + i;
+    // fill EV matrix (16 elem * 32 = 512 bits / 512 bits = 1 mem read with 4 128-bit stream writes each (4 total))
+    buffer = mem[4];
+    for(unsigned int j = 0; j < 4; j++) {
+      x.data = buffer.range(127 + j*128, j*128);
       sEV.write(x);
     }
 
     for(unsigned int i = 0; i < iterations; i++) {
 #pragma HLS PIPELINE II=1
-      mem_128 = reinterpret_cast<ap_uint<128>*>(&mem[5+i]);
+      buffer = mem[5+i];
       for(unsigned int j = 0; j < 4; j++) {
-        x.data = mem_128 + j;
+        x.data = buffer.range(127 + j*128, j*128);
         s[j]->write(x);
       }
     }

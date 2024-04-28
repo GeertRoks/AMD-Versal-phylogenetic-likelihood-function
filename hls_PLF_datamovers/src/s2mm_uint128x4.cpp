@@ -25,14 +25,16 @@ extern "C" {
 #pragma HLS interface s_axilite port=return bundle=control
 
     const unsigned int iterations = (size>>4);
+    ap_uint<512> buffer = 0;
     hls::stream<ap_axiu<128,0,0,0>>* s[] = {&s0, &s1, &s2, &s3};
+
     for(unsigned int i = 0; i < iterations; i++) {
 #pragma HLS PIPELINE II=1
-      ap_uint<128>* mem_128 = reinterpret_cast<ap_uint<128>*>(&mem[i]);
-      for(unsigned int j = 0; j < 4; i++) {
+      for(unsigned int j = 0; j < 4; j++) {
         ap_axiu<128,0,0,0> x = s[j]->read();
-        mem_128[j] = x.data;
+        buffer.range(127+j*128, j*128) = x.data;
       }
+      mem[i] = buffer;
     }
   }
 
