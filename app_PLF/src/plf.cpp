@@ -6,8 +6,8 @@ void plf(
     float *EV, const int n, float *left, float *right
     )
 {
-  int i, j, k, l, scale, addScale = 0;
-  float *x1, *x2, *x3, buf, ump_x1, ump_x2, x1px2[4];
+  int i, j, k, l = 0;
+  float *x1, *x2, *x3, ump_x1, ump_x2, x1px2[4];
 
   for (i = 0; i < n; i++)
   {

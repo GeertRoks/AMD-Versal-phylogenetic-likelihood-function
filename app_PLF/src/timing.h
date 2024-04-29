@@ -21,12 +21,31 @@ private:
   std::chrono::time_point<Clock> m_beg { Clock::now() };
 };
 
-template <size_t num_blocks>
 struct timing_data {
-  double begin[num_blocks];
-  double t1[num_blocks];
-  double t2[num_blocks];
-  double end[num_blocks];
+  timing_data(size_t num_blocks) {
+    this->num_blocks = num_blocks;
+    this->begin = new double[num_blocks];
+    this->t1 = new double[num_blocks];
+    this->t2 = new double[num_blocks];
+    this->end = new double[num_blocks];
+  }
+  ~timing_data() {
+    //NOTE: gives double free if deletes are enabled??
+    //delete[] begin;
+    //delete[] t1;
+    //delete[] t2;
+    //delete[] end;
+    //begin = nullptr;
+    //t1 = nullptr;
+    //t2 = nullptr;
+    //end = nullptr;
+  }
+  size_t num_blocks;
+  double* begin;
+  double* t1;
+  double* t2;
+  double* end;
+
   double hm(int i) { return t1[i] - begin[i]; };
   double msm(int i) { return t2[i] - t1[i]; };
   double mh(int i) { return end[i] - t2[i]; };
@@ -60,7 +79,7 @@ struct timing_data {
 double bandwidth(double time_ms, double data_size) {
   return ((double)data_size / (time_ms))/1000.0f; //MB per second
 }
-void print_timing_data(timing_data<BLOCKS> d, double data_size) {
+void print_timing_data(timing_data d, double data_size) {
   std::cout << std::endl;
   std::cout << "==========================================================================" << std::endl;
   std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) |" << std::endl;
@@ -80,10 +99,10 @@ void print_timing_data(timing_data<BLOCKS> d, double data_size) {
   std::cout << std::endl;
 }
 
-void write_to_csv(std::string filename, timing_data<BLOCKS> d) {
+void write_to_csv(std::string filename, timing_data d) {
   std::ofstream outputFile(filename);
   outputFile << "hm" << "," << "msasm" << "," << "mh" << std::endl;
-  for (unsigned int i = 0; i < BLOCKS; i++) {
+  for (unsigned int i = 0; i < d.num_blocks; i++) {
     outputFile << d.hm(i) << "," << d.msm(i) << "," << d.mh(i) << std::endl;
   }
   outputFile.close();

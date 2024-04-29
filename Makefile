@@ -78,7 +78,7 @@ VPP_AIE_FLAGS := --pl-freq=$(PL_FREQ)
 
 GCC_HOST_FLAGS := -g -Wall -std=c++17 -DAIE=$(AIE) -DPL=$(PL) -DPL_FREQ=$(PL_FREQ)
 GCC_HOST_INCLUDES := -I$(DIR_HOST)/src -I${XILINX_XRT}/include -L${XILINX_XRT}/lib
-GCC_HOST_LIBS := -lxrt_coreutil -pthread
+GCC_HOST_LIBS := -lxrt_coreutil -luuid -pthread
 
 ifdef NO_PRERUN_CHECK
 	GCC_HOST_FLAGS += -DNO_PRERUN_CHECK=$(NO_PRERUN_CHECK)
@@ -115,6 +115,7 @@ hls: $(HLS_XO)
 
 #####################################################################################################
 CURRENT_DATE_TIME := $(shell date +%Y%m%d-%H%M%S)
+PROJECT_ROOT := $(shell pwd)
 DIR_EMU_LOGS := emulation/$(VERSION)
 
 BUFFER_SIZE ?= 8388608
@@ -124,7 +125,7 @@ CHUNK_SIZES ?= 1048576 2097152 4194304
 BUFFER_SIZES ?= 33554432
 
 run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN) $(BUFFER_SIZE) $(CHUNK_SIZE)
+	$(DIR_BUILD)/hw/host.exe $(XCLBIN)
 
 run_hw_tests:
 	for buf in $(BUFFER_SIZES); do\
@@ -135,12 +136,13 @@ run_hw_tests:
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
-	@mkdir -p $(DIR_EMU_LOGS)/sw_emu_$(CURRENT_DATE_TIME)
+	@echo "Project root $(PROJECT_ROOT)"
+	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
-	cd $(DIR_EMU_LOGS)/sw_emu_$(CURRENT_DATE_TIME); \
-	../../../$(DIR_BUILD)/sw_emu/host.exe ../../../$(XCLBIN) $(BUFFER_SIZE) $(CHUNK_SIZE); \
-	cd ../../../
+	cd $(DIR_EMU_LOGS)/sw_emu; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	cd -
 
 
 aie_sim: $(DIR_BUILD)/hw/aie/libadf_$(AIE).a
@@ -151,7 +153,11 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 
 #####################################################################################################
 
-$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)/src/plf.cpp
+#$(DIR_BUILD)/$(TARGET)/app/%.o: $(DIR_HOST)/src/%.cpp
+#	$(dir_guard)
+#	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
+
+$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
