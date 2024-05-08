@@ -12,6 +12,7 @@ public:
   adf::port<input>  in_left_branch;
   adf::port<input>  in_right_branch;
   adf::port<input>  in_EV;
+  adf::port<input>  in_alignments;
 
   WindowPLFGraph(unsigned int start_col, unsigned int start_row) {
 
@@ -23,14 +24,18 @@ public:
       k_mul_and_EV[i] = adf::kernel::create(combine_and_mac_EV<window_data_size>);
       source(k_mul_and_EV[i]) = "kernels/combine_and_mac_EV.cpp";
 
-      adf::connect< adf::window<window_data_size>   >(in_left_data[i],   k_mmul_left[i].in[0]);
-      adf::connect< adf::window<window_data_size>   >(in_right_data[i],   k_mmul_right[i].in[0]);
-      adf::connect< adf::window<window_branch_size> >(in_left_branch, k_mmul_left[i].in[1]);
-      adf::connect< adf::window<window_branch_size> >(in_right_branch, k_mmul_right[i].in[1]);
+      adf::connect< adf::window<window_data_size>   >(in_left_data[i],  k_mmul_left[i].in[0]);
+      adf::connect< adf::window<window_data_size>   >(in_right_data[i], k_mmul_right[i].in[0]);
+      adf::connect< adf::window<window_branch_size> >(in_left_branch,   k_mmul_left[i].in[1]);
+      adf::connect< adf::window<window_branch_size> >(in_right_branch,  k_mmul_right[i].in[1]);
 
       adf::connect< adf::window<window_data_size>   >(k_mmul_left[i].out[0],  k_mul_and_EV[i].in[0]);
-      adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0],  k_mul_and_EV[i].in[1]);
-      adf::connect< adf::window<window_ev_size>     >(in_EV, k_mul_and_EV[i].in[2]);
+      adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0], k_mul_and_EV[i].in[1]);
+      adf::connect< adf::window<window_ev_size>     >(in_EV,                  k_mul_and_EV[i].in[2]);
+
+      adf::connect< adf::stream                     >(in_alignments, k_mmul_left[i].in[2]);
+      adf::connect< adf::stream                     >(in_alignments, k_mmul_right[i].in[2]);
+      adf::connect< adf::stream                     >(in_alignments, k_mul_and_EV[i].in[3]);
 
       adf::connect< adf::window<window_data_size>   >(k_mul_and_EV[i].out[0], out[i]);
 

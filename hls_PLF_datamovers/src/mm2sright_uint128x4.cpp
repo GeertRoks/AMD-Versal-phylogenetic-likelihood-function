@@ -12,7 +12,7 @@ SPDX-License-Identifier: X11
 
 extern "C" {
 
-  void mm2sright(ap_uint<512>* mem, unsigned int size, hls::stream<ap_axiu<128,0,0,0>> &s0, hls::stream<ap_axiu<128,0,0,0>> &s1, hls::stream<ap_axiu<128,0,0,0>> &s2, hls::stream<ap_axiu<128,0,0,0>> &s3, hls::stream<ap_axiu<128,0,0,0>> &sBranch) {
+  void mm2sright(ap_uint<512>* mem, unsigned int alignment_sites, hls::stream<ap_axiu<128,0,0,0>> &s0, hls::stream<ap_axiu<128,0,0,0>> &s1, hls::stream<ap_axiu<128,0,0,0>> &s2, hls::stream<ap_axiu<128,0,0,0>> &s3, hls::stream<ap_axiu<128,0,0,0>> &sBranch) {
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 
 #pragma HLS interface axis port=s0
@@ -22,10 +22,9 @@ extern "C" {
 #pragma HLS interface axis port=sBranch
 
 #pragma HLS INTERFACE s_axilite port=mem bundle=control
-#pragma HLS INTERFACE s_axilite port=size bundle=control
+#pragma HLS INTERFACE s_axilite port=alignment_sites bundle=control
 #pragma HLS interface s_axilite port=return bundle=control
 
-    const unsigned int iterations = (size>>4);
     ap_uint<512> buffer = 0;
     hls::stream<ap_axiu<128,0,0,0>>* s[] = {&s0, &s1, &s2, &s3};
     ap_axiu<128,0,0,0> x;
@@ -39,7 +38,7 @@ extern "C" {
       }
     }
 
-    for(unsigned int i = 0; i < iterations; i++) {
+    for(unsigned int i = 0; i < alignment_sites; i++) {
 #pragma HLS PIPELINE II=1
       buffer = mem[4+i];
       for(unsigned int j = 0; j < 4; j++) {

@@ -6,9 +6,11 @@
 #define VECTOR_SIZE 4
 
 template <uint16_t data_window_size>
-void mmul_branch(input_window<float>* in_data, input_window<float>* in_branch_matrix, output_window<float>* out) {
+void mmul_branch(input_window<float>* in_data, input_window<float>* in_branch_matrix, input_stream<uint32_t>* in_alignments, output_window<float>* out) {
 
-  //window_size (in bytes) div by 16 = num iterations to complete full window (div by 4 bytes per word and div by 4 elements per block = div by 16)
+  // alignment sites div by 4 elements per block = num iterations to complete full sequence (round up to the next integer)
+  const uint32_t alignment_sites = readincr(in_alignments);
+  //const uint16_t blocks = ((alignment_sites+3)>>2)
   const uint16_t blocks = (data_window_size>>4);
 
   using MMUL = aie::mmul<4,4,1,float,float>;
@@ -17,7 +19,7 @@ void mmul_branch(input_window<float>* in_data, input_window<float>* in_branch_ma
   aie::vector<float, 4> data;
 
   branch = window_readincr_v<16>(in_branch_matrix);
-  for (uint16_t i=0; i<blocks; i++) {
+  for (uint16_t i=0; i<alignment_sites; i++) {
 
     data = window_readincr_v<4>(in_data);
 
