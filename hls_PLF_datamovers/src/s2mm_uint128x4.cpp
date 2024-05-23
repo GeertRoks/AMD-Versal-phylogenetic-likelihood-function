@@ -27,14 +27,32 @@ extern "C" {
     ap_uint<512> buffer = 0;
     hls::stream<ap_axiu<128,0,0,0>>* s[] = {&s0, &s1, &s2, &s3};
 
-    for(unsigned int i = 0; i < alignment_sites; i++) {
+    // Receive alignment site data
+    unsigned int quotient = alignment_sites>>6;
+    unsigned int product = quotient<<6;
+    unsigned int remainder = alignment_sites - product;
+    remainder = 64-remainder;
+    for(unsigned int i = 0; i < alignment_sites+remainder; i++) {
 #pragma HLS PIPELINE II=1
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x = s[j]->read();
-        buffer.range(127+j*128, j*128) = x.data;
+      if (i < alignment_sites) {
+        for(unsigned int j = 0; j < 4; j++) {
+          ap_axiu<128,0,0,0> x = s[j]->read();
+          buffer.range(127+j*128, j*128) = x.data;
+        }
+        mem[i] = buffer;
+      } else {
+        for(unsigned int j = 0; j < 4; j++) {
+          ap_axiu<128,0,0,0> x = s[j]->read();
+        }
       }
-      mem[i] = buffer;
     }
+
+    // empty the output stream if alignments does not fit exactly in the aie window
+    //for(unsigned int i = 0; i < (alignment_sites%64); i++) {
+    //  for(unsigned int j = 0; j < 4; j++) {
+    //    ap_axiu<128,0,0,0> x = s[j]->read();
+    //  }
+    //}
   }
 
 }

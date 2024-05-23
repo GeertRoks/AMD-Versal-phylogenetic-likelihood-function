@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=128;
+  tb.alignment_sites=8192;
   tb.plf_calls = 1;
 
   std::cout << std::endl;
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
   if (acap.get_target() == "sw_emu") {
     std::cout << "enable graph" << std::endl;
     xrt::graph aie_graph(*acap.get_device(), *acap.get_uuid(), "mygraph");
-    aie_graph.run(tb.plf_calls);
+    aie_graph.run( tb.plf_calls * ((tb.alignment_sites+63)>>6) );
   }
 
   //Check before run///////////////////////////////////////////////////////////////////////////////////////////////////
