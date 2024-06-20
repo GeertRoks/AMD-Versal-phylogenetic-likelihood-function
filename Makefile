@@ -21,7 +21,7 @@ VERSION := PLFv1
 PL := uint128
 AIE := 128x1PLF
 
-PL_FREQ := 300
+#PL_FREQ := 300
 AIE_FREQ := 300
 
 # Targets: sw_emu, hw_emu, hw
@@ -66,19 +66,23 @@ VPP_LINK_DEPS := $(AIE_LIBADF) $(HLS_XO)
 VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
 
 #v++ flags
-VPP_PROFILE_FLAGS := --profile.aie=all --profile.stall=all:all:all --profile.data=all:all:all --profile.exec=all:all
+#VPP_PROFILE_FLAGS := --profile.aie=all --profile.stall=all:all:all --profile.data=all:all:all --profile.exec=all:all
 VPP_VIVADO_FLAGS := --vivado.impl.jobs 8 --vivado.synth.jobs 8
 VPP_PACKAGE_FLAGS := --package.boot_mode ospi --package.out_dir $(DIR_BUILD)/$(TARGET)/package
 #VPP_PACKAGE_FLAGS += --package.defer_aie_run
 VPP_INTERMEDIATE_FILE_DIRS := --save-temps --temp_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/temp --report_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/reports --log_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/logs
-#VPP_LINK_CLOCK_FLAGS := --clock.freqHz $(PL_FREQ)000000:mm2s_0,s2mm_0 --clock.freqHz $(AIE_FREQ)000000:ai_engine_0
-VPP_LINK_CLOCK_FLAGS := --kernel_frequency 0:$(PL_FREQ)
 VPP_HLS_FLAGS := --hls.jobs 8
-VPP_AIE_FLAGS := --pl-freq=$(PL_FREQ)
 
-GCC_HOST_FLAGS := -g -Wall -std=c++17 -DAIE=$(AIE) -DPL=$(PL) -DPL_FREQ=$(PL_FREQ)
+GCC_HOST_FLAGS := -g -Wall -std=c++17 -DAIE=$(AIE) -DPL=$(PL)
 GCC_HOST_INCLUDES := -I$(DIR_HOST)/src -I${XILINX_XRT}/include -L${XILINX_XRT}/lib
 GCC_HOST_LIBS := -lxrt_coreutil -luuid -pthread
+
+ifdef PL_FREQ
+	#VPP_LINK_CLOCK_FLAGS := --clock.freqHz $(PL_FREQ)000000:mm2s_0,s2mm_0 --clock.freqHz $(AIE_FREQ)000000:ai_engine_0
+	VPP_LINK_CLOCK_FLAGS := --kernel_frequency 0:$(PL_FREQ)
+	VPP_AIE_FLAGS := --pl-freq=$(PL_FREQ)
+	GCC_HOST_FLAGS += -DPL_FREQ=$(PL_FREQ)
+endif
 
 ifdef NO_PRERUN_CHECK
 	GCC_HOST_FLAGS += -DNO_PRERUN_CHECK=$(NO_PRERUN_CHECK)
@@ -185,7 +189,8 @@ $(XSA): $(VPP_LINK_DEPS)
 
 $(DIR_BUILD)/$(TARGET)/hls/%.xo: $(DIR_HLS)/src/%.cpp
 	$(dir_guard)
-	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) --hls.clock $(PL_FREQ)000000:$(firstword $(subst _, ,$*)) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
+	#v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) --hls.clock $(PL_FREQ)000000:$(firstword $(subst _, ,$*)) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
+	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
 
 %emconfig.json:
 	emconfigutil --platform $(PLATFORM) --nd 1 --od $(@D)

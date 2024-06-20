@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=8192;
+  tb.alignment_sites=16;
   tb.plf_calls = 1;
 
   std::cout << std::endl;
