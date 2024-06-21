@@ -12,8 +12,9 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=16;
+  tb.alignment_sites=512;
   tb.plf_calls = 1;
+  tb.window_size = 1024;
 
   std::cout << std::endl;
   std::cout << "=======================================================================" << std::endl;
@@ -84,14 +85,17 @@ int main(int argc, char* argv[]) {
     mm2sleft_run[i] = xrt::run(mm2sleft_kernels[i]);
     mm2sleft_run[i].set_arg(0, in_left_buffer);
     mm2sleft_run[i].set_arg(1, tb.alignment_sites);
+    mm2sleft_run[i].set_arg(2, tb.window_size);
 
     mm2sright_run[i] = xrt::run(mm2sright_kernels[i]);
     mm2sright_run[i].set_arg(0, in_right_buffer);
     mm2sright_run[i].set_arg(1, tb.alignment_sites);
+    mm2sright_run[i].set_arg(2, tb.window_size);
 
     s2mm_run[i] = xrt::run(s2mm_kernels[i]);
     s2mm_run[i].set_arg(0, out_buffer);
     s2mm_run[i].set_arg(1, tb.alignment_sites);
+    s2mm_run[i].set_arg(2, tb.window_size);
   }
 
   // In sw_emu the aie graph needs to be started manually

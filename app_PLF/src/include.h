@@ -112,6 +112,7 @@ struct testbench_info {
   unsigned int alignment_sites;
   unsigned int elements_per_alignment = 16;
   unsigned int plf_calls;
+  unsigned int window_size;
   //unsigned int num_plf_calls { return this->data_elements/(this->elements_per_plf()); }
 
   unsigned int data_size() { return this->data_elements() * this->word_size; }

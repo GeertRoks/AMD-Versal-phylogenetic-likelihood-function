@@ -2,20 +2,22 @@
 #include <adf.h>
 #include "kernels.h"
 
+#define LANES_PER_GRAPH 4
+
 template<uint16_t window_data_size, uint16_t window_branch_size, uint16_t window_ev_size>
 class WindowPLFGraph : public adf::graph {
 public:
-  adf::port<input>  in_left_data[4];
-  adf::port<input>  in_right_data[4];
-  adf::port<output> out[4];
+  adf::port<input>  in_left_data[LANES_PER_GRAPH];
+  adf::port<input>  in_right_data[LANES_PER_GRAPH];
+  adf::port<output> out[LANES_PER_GRAPH];
 
-  adf::port<input>  in_left_branch;
-  adf::port<input>  in_right_branch;
+  adf::port<input>  in_left_branch[LANES_PER_GRAPH];
+  adf::port<input>  in_right_branch[LANES_PER_GRAPH];
   adf::port<input>  in_EV;
 
   WindowPLFGraph(unsigned int start_col, unsigned int start_row) {
 
-    for (unsigned int i = 0; i < 4; i++) {
+    for (unsigned int i = 0; i < LANES_PER_GRAPH; i++) {
       k_mmul_left[i] = adf::kernel::create(mmul_branch<window_data_size>);
       source(k_mmul_left[i]) = "kernels/mmul_branch.cpp";
       k_mmul_right[i] = adf::kernel::create(mmul_branch<window_data_size>);
@@ -25,8 +27,8 @@ public:
 
       adf::connect< adf::window<window_data_size>   >(in_left_data[i],   k_mmul_left[i].in[0]);
       adf::connect< adf::window<window_data_size>   >(in_right_data[i],   k_mmul_right[i].in[0]);
-      adf::connect< adf::window<window_branch_size> >(in_left_branch, k_mmul_left[i].in[1]);
-      adf::connect< adf::window<window_branch_size> >(in_right_branch, k_mmul_right[i].in[1]);
+      adf::connect< adf::window<window_branch_size> >(in_left_branch[i], k_mmul_left[i].in[1]);
+      adf::connect< adf::window<window_branch_size> >(in_right_branch[i], k_mmul_right[i].in[1]);
 
       adf::connect< adf::window<window_data_size>   >(k_mmul_left[i].out[0],  k_mul_and_EV[i].in[0]);
       adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0],  k_mul_and_EV[i].in[1]);
@@ -50,7 +52,7 @@ public:
   }
 
 private:
-  adf::kernel k_mmul_left[4];
-  adf::kernel k_mmul_right[4];
-  adf::kernel k_mul_and_EV[4];
+  adf::kernel k_mmul_left[LANES_PER_GRAPH];
+  adf::kernel k_mmul_right[LANES_PER_GRAPH];
+  adf::kernel k_mul_and_EV[LANES_PER_GRAPH];
 };

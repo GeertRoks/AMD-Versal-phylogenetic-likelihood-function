@@ -56,9 +56,9 @@ define VPP_CONNECTION_FLAGS
 $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sleft_$$i.s$$j:ai_engine_0.plio_in_$${i}_0_$${j}"; done; done) \
 $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sright_$$i.s$$j:ai_engine_0.plio_in_$${i}_1_$${j}"; done; done) \
 $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc ai_engine_0.plio_out_$${i}_$${j}:s2mm_$$i.s$$j"; done; done) \
-$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done) \
-$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sBranch:ai_engine_0.plio_in_branch_$${i}_0"; done) \
-$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sright_$$i.sBranch:ai_engine_0.plio_in_branch_$${i}_1"; done)
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sleft_$$i.sBranch$${j}:ai_engine_0.plio_in_branch_$${i}_0_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sright_$$i.sBranch$${j}:ai_engine_0.plio_in_branch_$${i}_1_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
 HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
