@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=512;
+  tb.alignment_sites=2097152;
   tb.plf_calls = 1;
   tb.window_size = 1024;
 
