@@ -27,21 +27,21 @@ public:
     for(unsigned int i = 0; i < NUM_GRAPHS; i++) {
 
       // EV
-      plio_in_EV[i] = adf::input_plio::create(plio_name("in_EV", i), adf::plio_128_bits, data_name("input", 1));
+      plio_in_EV[i] = adf::input_plio::create(plio_name("in_EV", i), adf::plio_128_bits, data_name("inputEV", 0));
       adf::connect< adf::stream, adf::window<WINDOW_EV_SIZE> >(plio_in_EV[i].out[0], graphs[i].in_EV);
 
       for(unsigned int j = 0; j < LANES_PER_GRAPH; j++) {
         const unsigned int idx = (i*LANES_PER_GRAPH)+j;
 
         // data input
-        plio_in_left_data[idx]  = adf::input_plio::create(plio_name_in("in", i, 0, j), adf::plio_128_bits, data_name("input", 0));
-        plio_in_right_data[idx] = adf::input_plio::create(plio_name_in("in", i, 1, j), adf::plio_128_bits, data_name("input", 0));
+        plio_in_left_data[idx]  = adf::input_plio::create(plio_name_in("in", i, 0, j), adf::plio_128_bits, data_name("inputdataleft", j));
+        plio_in_right_data[idx] = adf::input_plio::create(plio_name_in("in", i, 1, j), adf::plio_128_bits, data_name("inputdataright", j));
         adf::connect< adf::stream, adf::window<WINDOW_DATA_SIZE> >(plio_in_left_data[idx].out[0],  graphs[i].in_left_data[idx]);
         adf::connect< adf::stream, adf::window<WINDOW_DATA_SIZE> >(plio_in_right_data[idx].out[0], graphs[i].in_right_data[idx]);
 
         // branches
-        plio_in_left_branch[idx]  = adf::input_plio::create(plio_name_branch("in_branch", i, 0, j), adf::plio_128_bits, data_name("input", 1));
-        plio_in_right_branch[idx] = adf::input_plio::create(plio_name_branch("in_branch", i, 1, j), adf::plio_128_bits, data_name("input", 1));
+        plio_in_left_branch[idx]  = adf::input_plio::create(plio_name_branch("in_branch", i, 0, j), adf::plio_128_bits, data_name("inputbranchleft", j));
+        plio_in_right_branch[idx] = adf::input_plio::create(plio_name_branch("in_branch", i, 1, j), adf::plio_128_bits, data_name("inputbranchright", j));
         adf::connect< adf::stream, adf::window<WINDOW_BRANCH_SIZE> >(plio_in_left_branch[idx].out[0],  graphs[i].in_left_branch[j]);
         adf::connect< adf::stream, adf::window<WINDOW_BRANCH_SIZE> >(plio_in_right_branch[idx].out[0], graphs[i].in_right_branch[j]);
 
