@@ -61,7 +61,7 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
-HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
+HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/transpose.xo
 VPP_LINK_DEPS := $(AIE_LIBADF) $(HLS_XO)
 VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
 
@@ -185,12 +185,12 @@ $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 
 $(XSA): $(VPP_LINK_DEPS)
 	$(dir_guard)
-	v++ -l -t $(TARGET) -g --platform $(PLATFORM) $(VPP_LINK_CLOCK_FLAGS) $(VPP_PROFILE_FLAGS) $(VPP_VIVADO_FLAGS) $(call VPP_CONNECTION_FLAGS,$(NUM_AIE_IO)) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -o $(XSA)
+	v++ -l -t $(TARGET) -g --platform $(PLATFORM) $(VPP_LINK_CLOCK_FLAGS) $(VPP_PROFILE_FLAGS) $(VPP_VIVADO_FLAGS) $(call VPP_CONNECTION_FLAGS,$(NUM_AIE_IO)) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -I $(DIR_HLS)/src -o $(XSA)
 
 $(DIR_BUILD)/$(TARGET)/hls/%.xo: $(DIR_HLS)/src/%.cpp
 	$(dir_guard)
 	#v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) --hls.clock $(PL_FREQ)000000:$(firstword $(subst _, ,$*)) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
-	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
+	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -I $(DIR_HLS)/src -o $@
 
 %emconfig.json:
 	emconfigutil --platform $(PLATFORM) --nd 1 --od $(@D)
