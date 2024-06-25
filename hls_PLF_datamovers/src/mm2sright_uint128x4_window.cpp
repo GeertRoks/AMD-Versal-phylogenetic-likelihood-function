@@ -12,6 +12,21 @@ SPDX-License-Identifier: X11
 
 extern "C" {
 
+  // Function to transpose a 4x4 matrix represented as a single ap_uint<512> element
+  void transposeRight(ap_uint<512> &input) {
+    ap_uint<32> temp = 0;
+    int idx1, idx2 = 0;
+    for(int i = 0; i < 4; i++) {
+      for (int j = i+1; j < 4; j++) {
+        idx1 = (i*4+j)*32;
+        idx2 = (j*4+i)*32;
+        temp = input.range(idx2 + 31, idx2);
+        input.range(idx2 + 31, idx2) = input.range(idx1 + 31, idx1);
+        input.range(idx1 + 31, idx1) = temp;
+      }
+    }
+  }
+
   void mm2sright(ap_uint<512>* mem, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>> &s0, hls::stream<ap_axiu<128,0,0,0>> &s1, hls::stream<ap_axiu<128,0,0,0>> &s2, hls::stream<ap_axiu<128,0,0,0>> &s3, hls::stream<ap_axiu<128,0,0,0>> &sBranch0, hls::stream<ap_axiu<128,0,0,0>> &sBranch1, hls::stream<ap_axiu<128,0,0,0>> &sBranch2, hls::stream<ap_axiu<128,0,0,0>> &sBranch3) {
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 
@@ -30,6 +45,7 @@ extern "C" {
 #pragma HLS interface s_axilite port=return bundle=control
 
     ap_uint<512> buffer = 0;
+    ap_uint<512> buffer_intermediate = 0;
     hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
     //hls::stream<ap_axiu<128,0,0,0>>* branch_streams[] = {&sBranch0, &sBranch1, &sBranch2, &sBranch3};
     ap_axiu<128,0,0,0> x;
@@ -47,21 +63,25 @@ extern "C" {
       // Split the branch matrix and send them to each branch stream individually
       // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
       buffer = mem[0];
+      transposeRight(buffer);
       for(unsigned int j = 0; j < 4; j++) {
         x.data = buffer.range(127 + j*128, j*128);
         sBranch0.write(x);
       }
       buffer = mem[1];
+      transposeRight(buffer);
       for(unsigned int j = 0; j < 4; j++) {
         x.data = buffer.range(127 + j*128, j*128);
         sBranch1.write(x);
       }
       buffer = mem[2];
+      transposeRight(buffer);
       for(unsigned int j = 0; j < 4; j++) {
         x.data = buffer.range(127 + j*128, j*128);
         sBranch2.write(x);
       }
       buffer = mem[3];
+      transposeRight(buffer);
       for(unsigned int j = 0; j < 4; j++) {
         x.data = buffer.range(127 + j*128, j*128);
         sBranch3.write(x);
