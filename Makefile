@@ -150,7 +150,7 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 
 
 aie_sim: $(DIR_BUILD)/hw/aie/libadf_$(AIE).a
-	aiesimulator --pkg-dir=$(<D)/Work_$(AIE) -wdb -ctf --input-dir=$(DIR_AIE) --profile --dump-vcd=foo --output-dir=$(DIR_BUILD)/aiesimulator_output
+	aiesimulator --pkg-dir=$(<D)/Work_$(AIE) --input-dir=$(DIR_AIE) --output-dir=$(DIR_BUILD)/aiesimulator_output --profile --dump-vcd=foo --output-time-stamp=no
 
 aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 	x86simulator --pkg-dir=$(<D)/Work_$(AIE) --input-dir=$(DIR_AIE) --output-dir=$(DIR_BUILD)/x86simulator_output
