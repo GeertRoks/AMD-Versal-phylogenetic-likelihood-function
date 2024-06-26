@@ -29,6 +29,9 @@ x86simulator_output/
 tmp.vcd.vcd
 pl_sample_counts
 trdata.aiesim/
+foo.vcd
+ISS_RPC_SERVER_PORT
+pl_sample_count_*
 
 #Ignore profiling data
 *.csv
