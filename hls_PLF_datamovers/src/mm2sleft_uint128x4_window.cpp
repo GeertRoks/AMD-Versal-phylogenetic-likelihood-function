@@ -8,7 +8,6 @@ SPDX-License-Identifier: X11
 #include <hls_stream.h>
 #include <ap_axi_sdata.h>
 #include <stdio.h>
-#include "transpose.h"
 
 
 extern "C" {
