@@ -22,19 +22,23 @@ public:
       source(k_mmul_left[i]) = "kernels/mmul_branch.cpp";
       k_mmul_right[i] = adf::kernel::create(mmul_branch<window_data_size>);
       source(k_mmul_right[i]) = "kernels/mmul_branch.cpp";
-      k_mul_and_EV[i] = adf::kernel::create(combine_and_mac_EV<window_data_size>);
-      source(k_mul_and_EV[i]) = "kernels/combine_and_mac_EV.cpp";
+      k_combine[i] = adf::kernel::create(combine<window_data_size>);
+      source(k_combine[i]) = "kernels/combine.cpp";
+      k_EV[i] = adf::kernel::create(ev<window_data_size>);
+      source(k_EV[i]) = "kernels/ev.cpp";
 
       adf::connect< adf::window<window_data_size>   >(in_left_data[i],   k_mmul_left[i].in[0]);
       adf::connect< adf::window<window_data_size>   >(in_right_data[i],   k_mmul_right[i].in[0]);
       adf::connect< adf::window<window_branch_size> >(in_left_branch[i], k_mmul_left[i].in[1]);
       adf::connect< adf::window<window_branch_size> >(in_right_branch[i], k_mmul_right[i].in[1]);
 
-      adf::connect< adf::window<window_data_size>   >(k_mmul_left[i].out[0],  k_mul_and_EV[i].in[0]);
-      adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0],  k_mul_and_EV[i].in[1]);
-      adf::connect< adf::window<window_ev_size>     >(in_EV, k_mul_and_EV[i].in[2]);
+      adf::connect< adf::window<window_data_size>   >(k_mmul_left[i].out[0],  k_combine[i].in[0]);
+      adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0],  k_combine[i].in[1]);
 
-      adf::connect< adf::window<window_data_size>   >(k_mul_and_EV[i].out[0], out[i]);
+      adf::connect< adf::window<window_ev_size>     >(k_combine[i].out[0], k_EV[i].in[0]);
+      adf::connect< adf::window<window_ev_size>     >(in_EV, k_EV[i].in[1]);
+
+      adf::connect< adf::window<window_data_size>   >(k_EV[i].out[0], out[i]);
 
       //adf::location<adf::kernel>(k_mmul_left[i]) = adf::tile(start_col + i, start_row);
       //adf::location<adf::stack>(k_mmul_left[i]) = adf::bank(start_col + i, start_row, 2);
@@ -47,12 +51,14 @@ public:
 
       adf::runtime<ratio>(k_mmul_left[i]) = 1;
       adf::runtime<ratio>(k_mmul_right[i]) = 1;
-      adf::runtime<ratio>(k_mul_and_EV[i]) = 1;
+      adf::runtime<ratio>(k_combine[i]) = 1;
+      adf::runtime<ratio>(k_EV[i]) = 1;
     }
   }
 
 private:
   adf::kernel k_mmul_left[LANES_PER_GRAPH];
   adf::kernel k_mmul_right[LANES_PER_GRAPH];
-  adf::kernel k_mul_and_EV[LANES_PER_GRAPH];
+  adf::kernel k_combine[LANES_PER_GRAPH];
+  adf::kernel k_EV[LANES_PER_GRAPH];
 };
