@@ -45,9 +45,7 @@ extern "C" {
 #pragma HLS interface s_axilite port=return bundle=control
 
     ap_uint<512> buffer = 0;
-    ap_uint<512> buffer_intermediate = 0;
     hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
-    //hls::stream<ap_axiu<128,0,0,0>>* branch_streams[] = {&sBranch0, &sBranch1, &sBranch2, &sBranch3};
     ap_axiu<128,0,0,0> x;
 
     const unsigned int alignments_per_window = (window_size>>4); // (window_size/4 bytes per value)/4 values per window

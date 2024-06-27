@@ -5,6 +5,7 @@
 
 #ifdef FALSE
 
+// original: 1516 cycles
 template <uint16_t data_window_size>
 void combine_and_mac_EV(input_window<float>* in_left, input_window<float>* in_right, input_window<float>* in_EV_matrix, output_window<float>* out) {
 
@@ -41,7 +42,40 @@ void combine_and_mac_EV(input_window<float>* in_left, input_window<float>* in_ri
   }
 }
 
+// mmul 4x4x1: 804 cycles
+template <uint16_t data_window_size>
+void combine_and_mac_EV(input_window<float>* __restrict in_left, input_window<float>* __restrict in_right,
+                        input_window<float>* __restrict in_EV_matrix, output_window<float>* __restrict out) {
 
+  const uint16_t blocks = (data_window_size>>5);
+  using MMUL = aie::mmul<4,4,1,float,float>;
+  MMUL matrix_mul;
+
+  // EV is expected transposed
+  auto v_EV = window_readincr_v<16>(in_EV_matrix);
+
+  for (uint16_t i=0; i<blocks; i++)
+  chess_prepare_for_pipelining
+  chess_loop_range(blocks,)
+  {
+    // get data in
+    auto data_left  = window_readincr_v<8>(in_left);
+    auto data_right = window_readincr_v<8>(in_right);
+
+    // combine left and right data by multiplying them together
+    aie::vector<float, 8> data = aie::mul(data_left, data_right);
+
+    matrix_mul.mul(v_EV, data.extract<4>(0));
+    window_writeincr(out, matrix_mul.to_vector<float>());
+    matrix_mul.mul(v_EV, data.extract<4>(1));
+    window_writeincr(out, matrix_mul.to_vector<float>());
+
+  }
+}
+
+#else
+
+// mmul 2x4x4: 676 cycles
 template <uint16_t data_window_size>
 void combine_and_mac_EV(input_window<float>* __restrict in_left, input_window<float>* __restrict in_right, input_window<float>* __restrict in_EV_matrix, output_window<float>* __restrict out) {
 
@@ -79,36 +113,5 @@ void combine_and_mac_EV(input_window<float>* __restrict in_left, input_window<fl
   }
 }
 
-#else
-
-template <uint16_t data_window_size>
-void combine_and_mac_EV(input_window<float>* __restrict in_left, input_window<float>* __restrict in_right,
-                        input_window<float>* __restrict in_EV_matrix, output_window<float>* __restrict out) {
-
-  const uint16_t blocks = (data_window_size>>5);
-  using MMUL = aie::mmul<4,4,1,float,float>;
-  MMUL matrix_mul;
-
-  // EV is expected transposed
-  auto v_EV = window_readincr_v<16>(in_EV_matrix);
-
-  for (uint16_t i=0; i<blocks; i++) 
-  chess_prepare_for_pipelining
-  chess_loop_range(blocks,)
-  {
-    // get data in
-    auto data_left  = window_readincr_v<8>(in_left);
-    auto data_right = window_readincr_v<8>(in_right);
-
-    // combine left and right data by multiplying them together
-    aie::vector<float, 8> data = aie::mul(data_left, data_right);
-    
-    matrix_mul.mul(v_EV, data.extract<4>(0));
-    window_writeincr(out, matrix_mul.to_vector<float>());
-    matrix_mul.mul(v_EV, data.extract<4>(1));
-    window_writeincr(out, matrix_mul.to_vector<float>());
-
-  }
-}
 
 #endif

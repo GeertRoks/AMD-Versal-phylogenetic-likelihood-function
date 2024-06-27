@@ -47,7 +47,6 @@ extern "C" {
 
     // per alignment site there are 16 values (4 streams each carrying 4 values per packet)
     ap_uint<512> buffer = 0;
-    ap_uint<512> buffer_intermediate = 0;
     hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
     ap_axiu<128,0,0,0> x;
 
