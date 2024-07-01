@@ -35,7 +35,7 @@ public:
       adf::connect< adf::window<window_data_size>   >(k_mmul_left[i].out[0],  k_combine[i].in[0]);
       adf::connect< adf::window<window_data_size>   >(k_mmul_right[i].out[0],  k_combine[i].in[1]);
 
-      adf::connect< adf::window<window_ev_size>     >(k_combine[i].out[0], k_EV[i].in[0]);
+      adf::connect< adf::window<window_data_size>   >(k_combine[i].out[0], k_EV[i].in[0]);
       adf::connect< adf::window<window_ev_size>     >(in_EV, k_EV[i].in[1]);
 
       adf::connect< adf::window<window_data_size>   >(k_EV[i].out[0], out[i]);
