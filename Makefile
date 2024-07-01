@@ -18,8 +18,10 @@ PLATFORM := /home/s2716879/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_
 WORKSPACE := PLF
 VERSION := PLFv1
 
-PL := uint128
-AIE := 128x1PLF
+PL ?= uint128x4
+AIE ?= 128x1PLF
+
+PL_TYPE := $(patsubst uint128x4%,%,$(PL))
 
 #PL_FREQ := 300
 AIE_FREQ := 300
@@ -44,12 +46,27 @@ AIE_SRCS_OTHER := $(filter-out $(AIE_SRCS_MAIN), $(wildcard $(DIR_AIE)/src/$(VER
 
 # artefacts
 AIE_LIBADF := $(DIR_BUILD)/$(AIE_TARGET)/aie/libadf_$(AIE).a
-HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2s_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
+HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
 XSA := $(DIR_BUILD)/$(TARGET)/sys/$(WORKSPACE)_$(PL)_$(AIE).xsa
 XCLBIN := $(DIR_BUILD)/$(TARGET)/$(WORKSPACE)_$(PL)_$(AIE).xclbin
 
+VPP_LINK_DEPS := $(AIE_LIBADF) $(HLS_XO)
+VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
 
-define VPP_CONNECTION_FLAGS
+NUM_AIE_IO := $(shell echo $(AIE) | sed -n 's/.*x\([0-9]*\).*/\1/p')
+
+
+define VPP_CONNECTION_FLAGS_1_INPUT
+--connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sleft_$$i.s$$j:ai_engine_0.plio_in_$${i}_0_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sright_$$i.s$$j:ai_engine_0.plio_in_$${i}_1_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc ai_engine_0.plio_out_$${i}_$${j}:s2mm_$$i.s$$j"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
+endef
+
+define VPP_CONNECTION_FLAGS_2_INPUTS
 --connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
@@ -61,9 +78,11 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
-HLS_XO := $(DIR_BUILD)/$(TARGET)/hls/mm2sleft_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/mm2sright_$(PL).xo $(DIR_BUILD)/$(TARGET)/hls/s2mm_$(PL).xo
-VPP_LINK_DEPS := $(AIE_LIBADF) $(HLS_XO)
-VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
+ifeq ($(PL_TYPE),window2in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
+else ifeq ($(PL_TYPE),window1in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
+endif
 
 #v++ flags
 #VPP_PROFILE_FLAGS := --profile.aie=all --profile.stall=all:all:all --profile.data=all:all:all --profile.exec=all:all
@@ -92,8 +111,6 @@ ifdef BLOCKS
 	GCC_HOST_FLAGS += -DBLOCKS=$(BLOCKS)
 endif
 
-
-NUM_AIE_IO := $(shell echo $(AIE) | sed -n 's/.*x\([0-9]*\).*/\1/p')
 
 
 ifeq ($(strip ${XILINX_XRT}),)
@@ -186,7 +203,7 @@ $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 
 $(XSA): $(VPP_LINK_DEPS)
 	$(dir_guard)
-	v++ -l -t $(TARGET) -g --platform $(PLATFORM) $(VPP_LINK_CLOCK_FLAGS) $(VPP_PROFILE_FLAGS) $(VPP_VIVADO_FLAGS) $(call VPP_CONNECTION_FLAGS,$(NUM_AIE_IO)) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -o $(XSA)
+	v++ -l -t $(TARGET) -g --platform $(PLATFORM) $(VPP_LINK_CLOCK_FLAGS) $(VPP_PROFILE_FLAGS) $(VPP_VIVADO_FLAGS) $(VPP_CONNECTION_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -o $(XSA)
 
 $(DIR_BUILD)/$(TARGET)/hls/%.xo: $(DIR_HLS)/src/%.cpp
 	$(dir_guard)

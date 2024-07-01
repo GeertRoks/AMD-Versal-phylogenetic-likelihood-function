@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=2097152;
+  tb.alignment_sites=1024;
   tb.plf_calls = 1;
   tb.window_size = 1024;
 
@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
   std::cout << "| alignment sites:        | " << tb.alignment_sites << std::endl;
   std::cout << "| data elements per site: | " << tb.elements_per_alignment << std::endl;
   std::cout << "| data elements per plf:  | " << tb.elements_per_plf() << std::endl;
+  std::cout << "| AIE window size:        | " << tb.window_size << std::endl;
   std::cout << "-----------------------------------------------------------------------" << std::endl;
   std::cout << "| data size:              | " << tb.data_size() << std::endl;
   std::cout << "| data elements:          | " << tb.data_elements() << std::endl;
