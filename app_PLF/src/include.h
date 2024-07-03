@@ -113,6 +113,7 @@ struct testbench_info {
   unsigned int elements_per_alignment = 16;
   unsigned int plf_calls;
   unsigned int window_size;
+  unsigned int combined_ev = 0;
   //unsigned int num_plf_calls { return this->data_elements/(this->elements_per_plf()); }
 
   unsigned int data_size() { return this->data_elements() * this->word_size; }
@@ -122,7 +123,7 @@ struct testbench_info {
   unsigned int buffer_size_right() { return this->word_size * this->buffer_elements_right(); }
   unsigned int buffer_size_out() { return this->word_size * this->buffer_elements_out(); }
   unsigned int buffer_elements_left()  { return (this->elements_per_plf() + 5*16); }
-  unsigned int buffer_elements_right() { return (this->elements_per_plf() + 4*16); }
+  unsigned int buffer_elements_right() { return combined_ev ? (this->elements_per_plf() + 5*16) : (this->elements_per_plf() + 4*16); }
   unsigned int buffer_elements_out() { return this->elements_per_plf(); }
   unsigned int elements_per_plf() { return this->alignment_sites * this->elements_per_alignment; }
 };

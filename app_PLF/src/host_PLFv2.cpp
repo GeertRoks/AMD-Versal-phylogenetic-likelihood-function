@@ -12,9 +12,10 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=1024;
+  tb.alignment_sites=10000;
   tb.plf_calls = 1;
   tb.window_size = 1024;
+  tb.combined_ev = 0;
 
   std::cout << std::endl;
   std::cout << "=======================================================================" << std::endl;
@@ -134,9 +135,16 @@ if(!prerun_check()){
       dataLeftInput[i][j] = (j%16)+1;
       dataRightInput[i][j] = (j%16)+1;
     }
-    for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-      dataLeftInput[i][80+j] = (j % 4) + 1;
-      dataRightInput[i][64+j] = (j % 4) + 1;
+    if (tb.combined_ev) {
+      for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
+        dataLeftInput[i][80+j] = (j % 4) + 1;
+        dataRightInput[i][80+j] = (j % 4) + 1;
+      }
+    } else {
+      for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
+        dataLeftInput[i][80+j] = (j % 4) + 1;
+        dataRightInput[i][64+j] = (j % 4) + 1;
+      }
     }
   }
 
@@ -182,7 +190,7 @@ if(!prerun_check()){
   std::string result = "Passed";
   unsigned int errors = 0;
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-    plf(&dataLeftInput[i][80], &dataRightInput[i][64], &checkOutput[i][0], &dataLeftInput[i][64], tb.alignment_sites, &dataLeftInput[i][0], &dataRightInput[i][0]);
+    plf(&dataLeftInput[i][80], &dataRightInput[i][80], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][16]);
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
       if(dataOutput[i][j]!=checkOutput[i][j]) {
         std::cout << "Failed at block: " << i << ", index: " << j << ", " << dataOutput[i][j] << "!=" << checkOutput[i][j] << std::endl;

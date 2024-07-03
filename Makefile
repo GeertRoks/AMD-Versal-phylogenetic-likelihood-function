@@ -66,6 +66,15 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
+define VPP_CONNECTION_FLAGS_1_INPUT_EV
+--connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
+--connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sleft_$$i.s$$j:ai_engine_0.plio_in_$${i}_0_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc mm2sright_$$i.s$$j:ai_engine_0.plio_in_$${i}_1_$${j}"; done; done) \
+$(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc ai_engine_0.plio_out_$${i}_$${j}:s2mm_$$i.s$$j"; done; done)
+endef
+
 define VPP_CONNECTION_FLAGS_2_INPUTS
 --connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
@@ -82,6 +91,8 @@ ifeq ($(PL_TYPE),window2in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
 else ifeq ($(PL_TYPE),window1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
+else ifeq ($(PL_TYPE),window1inEV)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 endif
 
 #v++ flags
