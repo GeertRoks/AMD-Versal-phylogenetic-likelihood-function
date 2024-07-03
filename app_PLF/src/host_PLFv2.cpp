@@ -185,12 +185,17 @@ if(!prerun_check()){
   xrt_profile.end();
 
   //Check///////////////////////////////////////////////////////////////////////////////////////////////////
+  std::cout << "Data collected, checking for correctness ..." << std::endl;
 
   // Test correctness of return data
   std::string result = "Passed";
   unsigned int errors = 0;
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-    plf(&dataLeftInput[i][80], &dataRightInput[i][80], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][16]);
+    if (tb.combined_ev) {
+      plf(&dataLeftInput[i][80], &dataRightInput[i][80], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][16]);
+    } else {
+      plf(&dataLeftInput[i][80], &dataRightInput[i][64], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][0]);
+    }
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
       if(dataOutput[i][j]!=checkOutput[i][j]) {
         std::cout << "Failed at block: " << i << ", index: " << j << ", " << dataOutput[i][j] << "!=" << checkOutput[i][j] << std::endl;
