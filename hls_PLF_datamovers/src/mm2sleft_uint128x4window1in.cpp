@@ -43,7 +43,7 @@ extern "C" {
 
     // per alignment site there are 16 values (4 streams each carrying 4 values per packet)
     ap_uint<512> buffer = 0;
-    hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
+    //hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
     ap_axiu<128,0,0,0> x;
 
     const unsigned int alignments_per_window = (window_size>>4); // (window_size/4 bytes per value)/4 values per window
@@ -64,32 +64,55 @@ extern "C" {
         sEV.write(x);
       }
 
+      // Split the branch matrix and prepend them to the corresponding data stream
+      // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
+      buffer = mem[1];
+      transposeLeft(buffer);
+      for(unsigned int j = 0; j < 4; j++) {
+        x.data = buffer.range(127 + j*128, j*128);
+        s0.write(x);
+      }
+      buffer = mem[2];
+      transposeLeft(buffer);
+      for(unsigned int j = 0; j < 4; j++) {
+        x.data = buffer.range(127 + j*128, j*128);
+        s1.write(x);
+      }
+      buffer = mem[3];
+      transposeLeft(buffer);
+      for(unsigned int j = 0; j < 4; j++) {
+        x.data = buffer.range(127 + j*128, j*128);
+        s2.write(x);
+      }
+      buffer = mem[4];
+      transposeLeft(buffer);
+      for(unsigned int j = 0; j < 4; j++) {
+        x.data = buffer.range(127 + j*128, j*128);
+        s3.write(x);
+      }
+
       // Send branch matrix and alignment site data for a window
-      for(unsigned int i = 0; i < 4 + alignments_per_window; i++) {
+      for(unsigned int i = 0; i < alignments_per_window; i++) {
         if (window >= num_windows-1 && remainder > 0 && i >= remainder) {
           // add zeroes to the input stream if alignments does not fit exactly in the last aie window
-          for(unsigned int j = 0; j < 4; j++) {
-            x.data = 0;
-            data_streams[j]->write(x);
-          }
-        } else if(i < 4) {
-          // Split the branch matrix and prepend them to the corresponding data stream
-          // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
-          buffer = mem[i+1];
-          transposeLeft(buffer);
-          for(unsigned int j = 0; j < 4; j++) {
-            x.data = buffer.range(127 + j*128, j*128);
-            data_streams[i]->write(x);
-          }
+          x.data = 0;
+          s0.write(x);
+          s1.write(x);
+          s2.write(x);
+          s3.write(x);
         } else {
           // read all 16 values of one alignement
           // ((512 bits read/8 bits per byte)/4 bytes per float = 16 values)
-          buffer = mem[1+(alignments_per_window*window)+i];
-          for(unsigned int j = 0; j < 4; j++) {
+          buffer = mem[5+(alignments_per_window*window)+i];
             // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
-            x.data = buffer.range(127 + j*128, j*128);
-            data_streams[j]->write(x);
-          }
+          x.data = buffer.range(127, 0);
+          s0.write(x);
+          x.data = buffer.range(255, 128);
+          s1.write(x);
+          x.data = buffer.range(383, 256);
+          s2.write(x);
+          x.data = buffer.range(511, 384);
+          s3.write(x);
         }
       }
 
