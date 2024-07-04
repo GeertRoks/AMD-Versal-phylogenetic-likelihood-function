@@ -93,6 +93,8 @@ else ifeq ($(PL_TYPE),window1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
 else ifeq ($(PL_TYPE),window1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
+else ifeq ($(PL_TYPE),stream2in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
 endif
 
 #v++ flags
@@ -185,6 +187,7 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 	x86simulator --pkg-dir=$(<D)/Work_$(AIE) --input-dir=$(DIR_AIE) --output-dir=$(DIR_BUILD)/x86simulator_output
 
 #####################################################################################################
+# HOST
 
 #$(DIR_BUILD)/$(TARGET)/app/%.o: $(DIR_HOST)/src/%.cpp
 #	$(dir_guard)
@@ -194,13 +197,16 @@ $(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
-#####################################################################################################
 
+#####################################################################################################
+# XCLBIN
 
 $(XCLBIN): $(VPP_PACKAGE_DEPS)
 	$(dir_guard)
 	v++ -p --target $(TARGET) --platform $(PLATFORM) $(VPP_PACKAGE_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -o $@
 
+#####################################################################################################
+# AIE GRAPH
 
 $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 	$(dir_guard)
@@ -211,20 +217,43 @@ $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 	v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(VERSION)/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(VERSION)/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
 	#aiecompiler --target $* --platform $(PLATFORM) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/kernels" -I "$(DIR_AIE)" --workdir=$(@D)/Work $< --output-archive $@
 
+#####################################################################################################
+# XSA
 
 $(XSA): $(VPP_LINK_DEPS)
 	$(dir_guard)
 	v++ -l -t $(TARGET) -g --platform $(PLATFORM) $(VPP_LINK_CLOCK_FLAGS) $(VPP_PROFILE_FLAGS) $(VPP_VIVADO_FLAGS) $(VPP_CONNECTION_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) $^ -o $(XSA)
 
-$(DIR_BUILD)/$(TARGET)/hls/%.xo: $(DIR_HLS)/src/%.cpp $(DIR_HLS)/src/transpose.cpp
+#####################################################################################################
+# HLS
+
+# hw
+$(DIR_BUILD)/hw/hls/%.xo: $(DIR_HLS)/src/%.cpp $(DIR_HLS)/src/transpose.cpp
+	$(dir_guard)
+	v++ -c --target hw --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -I$(DIR_HLS)/src -o $@
+
+# sw_emu
+$(DIR_BUILD)/sw_emu/hls/mm2sleft_%.xo: $(DIR_HLS)/src/mm2sleft_%.cpp $(DIR_HLS)/src/transpose.cpp
 	$(dir_guard)
 	#v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) --hls.clock $(PL_FREQ)000000:$(firstword $(subst _, ,$*)) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -o $@
-	v++ -c --target $(TARGET) --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -I$(DIR_HLS)/src -o $@
+	v++ -c --target sw_emu --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k mm2sleft $^ -I$(DIR_HLS)/src -o $@
+
+$(DIR_BUILD)/sw_emu/hls/mm2sright_%.xo: $(DIR_HLS)/src/mm2sright_%.cpp
+	$(dir_guard)
+	v++ -c --target sw_emu --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k mm2sright $^ -I$(DIR_HLS)/src -o $@
+
+$(DIR_BUILD)/sw_emu/hls/s2mm_%.xo: $(DIR_HLS)/src/s2mm_%.cpp
+	$(dir_guard)
+	v++ -c --target sw_emu --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k s2mm $^ -I$(DIR_HLS)/src -o $@
+
+#####################################################################################################
+# emu config
 
 %emconfig.json:
 	emconfigutil --platform $(PLATFORM) --nd 1 --od $(@D)
 
 #####################################################################################################
+# clean
 
 clean_x86sim:
 	rm -r $(DIR_BUILD)/x86sim/

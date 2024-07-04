@@ -151,6 +151,7 @@ if(!prerun_check()){
   }
 
 
+  std::cout << "Start PLF calculation on accelerator ... " << std::endl;
   //t.reset();
   xrt_profile.start("roundtrip_exec_time");
   for (long int i = 0; i < tb.plf_calls; i++) {
