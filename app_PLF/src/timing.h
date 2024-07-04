@@ -92,7 +92,7 @@ void print_timing_data(timing_data d, double data_size) {
   }
   std::cout << "| ACAP memory to host:                   | " << std::setw(10) << d.mh() << " | ";
   std::cout << std::setw(16) << bandwidth(d.mh(), data_size)    << " |" << std::endl;
-  std::cout << "|----------------------------------------+-------------------------------|" << std::endl;
+  std::cout << "|----------------------------------------+------------+------------------|" << std::endl;
   std::cout << "| Total execution time:                  | " << std::setw(10) << d.total() << " | ";
   std::cout << std::setw(16) << bandwidth(d.total(), data_size) << " |" << std::endl;
   std::cout << "==========================================================================" << std::endl;

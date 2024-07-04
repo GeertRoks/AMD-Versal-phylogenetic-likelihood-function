@@ -189,15 +189,26 @@ if(!prerun_check()){
   //Check///////////////////////////////////////////////////////////////////////////////////////////////////
   std::cout << "Data collected, checking for correctness ..." << std::endl;
 
+  timing_data reference_ms(tb.plf_calls);
+  t.reset();
+
   // Test correctness of return data
   std::string result = "Passed";
   unsigned int errors = 0;
-  for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-    if (tb.combined_ev) {
+  if (tb.combined_ev) {
+    for (unsigned long int i = 0; i < tb.plf_calls; i++) {
+      reference_ms.t1[i] = t.elapsed();
       plf(&dataLeftInput[i][80], &dataRightInput[i][80], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][16]);
-    } else {
-      plf(&dataLeftInput[i][80], &dataRightInput[i][64], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][0]);
+      reference_ms.t2[i] = t.elapsed();
     }
+  } else {
+    for (unsigned long int i = 0; i < tb.plf_calls; i++) {
+      reference_ms.t1[i] = t.elapsed();
+      plf(&dataLeftInput[i][80], &dataRightInput[i][64], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][0]);
+      reference_ms.t2[i] = t.elapsed();
+    }
+  }
+  for (unsigned long int i = 0; i < tb.plf_calls; i++) {
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
       if(dataOutput[i][j]!=checkOutput[i][j]) {
         std::cout << "Failed at block: " << i << ", index: " << j << ", " << dataOutput[i][j] << "!=" << checkOutput[i][j] << std::endl;
@@ -216,6 +227,16 @@ if(!prerun_check()){
   std::cout << std::endl;
   std::cout << "Test result: " << result << std::endl;
   print_timing_data(execution_ms, (double)tb.data_size());
+
+  std::cout << "==========================================================================" << std::endl;
+  std::cout << "| Reference:                             | " << std::setw(10) << reference_ms.msm() << " | ";
+  std::cout << std::setw(16) << ((double)tb.data_size() / (reference_ms.msm()))/1000.0f << " |" << std::endl;
+  std::cout << "|----------------------------------------+------------+------------------|" << std::endl;
+  std::cout << "| Speed up:                                           | ";
+  std::cout << std::setw(16) << reference_ms.msm()/execution_ms.msm() << " | " << std::endl;
+  std::cout << "==========================================================================" << std::endl;
+  std::cout << std::endl;
+
   //if (acap.get_target() == "hw") {
   //  std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_freq" + STRINGIFY(PL_FREQ) + "_plfs" + STRINGIFY(tb.plf_calls) + ".csv";
   //  //write_to_csv(csvFile, execution_ms);
