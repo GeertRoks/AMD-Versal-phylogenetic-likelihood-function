@@ -119,6 +119,7 @@ struct testbench_info {
   unsigned int data_size() { return this->data_elements() * this->word_size; }
   unsigned int data_elements() { return this->elements_per_plf() * plf_calls; }
   unsigned int word_size = sizeof(float);
+  unsigned long long int ram_usage() { unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out()); return ram_per_plf*this->plf_calls; }
   unsigned int buffer_size_left()  { return this->word_size * this->buffer_elements_left(); }
   unsigned int buffer_size_right() { return this->word_size * this->buffer_elements_right(); }
   unsigned int buffer_size_out() { return this->word_size * this->buffer_elements_out(); }

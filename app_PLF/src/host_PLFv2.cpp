@@ -12,8 +12,8 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=10000;
-  tb.plf_calls = 1;
+  tb.alignment_sites=1000000;
+  tb.plf_calls = 50;
   tb.window_size = 1024;
   tb.combined_ev = 0;
 
@@ -42,6 +42,8 @@ int main(int argc, char* argv[]) {
   std::cout << "| buffer elements left:   | " << tb.buffer_elements_left() << std::endl;
   std::cout << "| buffer elements right:  | " << tb.buffer_elements_right() << std::endl;
   std::cout << "| buffer elements out:    | " << tb.buffer_elements_out() << std::endl;
+  std::cout << "=======================================================================" << std::endl;
+  std::cout << "| RAM usage:              | " << tb.ram_usage()/1000000000.0 << " GB of 256 GB (" << tb.ram_usage()/256000000000.0 << "% )" << std::endl;
   std::cout << "=======================================================================" << std::endl;
   std::cout << "| device name:            | " << acap.get_device()->get_info<xrt::info::device::name>() << std::endl;
   std::cout << "| device bdf:             | " << acap.get_device()->get_info<xrt::info::device::bdf>() << std::endl;
