@@ -11,13 +11,12 @@ void ev(input_stream<float>* __restrict in_data, input_stream<float>* __restrict
   aie::vector<float, 8> result;
 
   unsigned int alignments = readincr(in_data);
-
   // divide by two, because two alignments processed per loop iteration
   alignments = alignments >> 1;
 
   aie::vector<float, 16> v_EV = readincr_v<16>(in_EV_matrix);
 
-  for (uint16_t i=0; i<alignments; i++)
+  for (unsigned int i=0; i<alignments; i++)
   chess_prepare_for_pipelining
   {
     data = readincr_v<8>(in_data);
