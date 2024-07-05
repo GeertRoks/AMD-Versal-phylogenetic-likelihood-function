@@ -95,6 +95,10 @@ else ifeq ($(PL_TYPE),window1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 else ifeq ($(PL_TYPE),stream2in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
+else ifeq ($(PL_TYPE),stream1in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
+else ifeq ($(PL_TYPE),stream1inEV)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 endif
 
 #v++ flags
