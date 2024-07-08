@@ -12,10 +12,11 @@ int main(int argc, char* argv[]) {
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=1000000;
+  tb.alignment_sites=250000;
   tb.plf_calls = 50;
   tb.window_size = 1024;
   tb.combined_ev = 0;
+  tb.parallel_instances = 1;
 
   std::cout << std::endl;
   std::cout << "=======================================================================" << std::endl;
@@ -81,24 +82,33 @@ int main(int argc, char* argv[]) {
   xrt::bo in_right_buffer = xrt::bo(*acap.get_device(), tb.buffer_size_right(), xrt::bo::flags::normal, mm2sright_kernels[0].group_id(0));
   xrt::bo out_buffer = xrt::bo(*acap.get_device(), tb.buffer_size_out(), xrt::bo::flags::normal, s2mm_kernels[0].group_id(0));
 
+  xrt::bo* in_left_plf = new xrt::bo[tb.parallel_instances];
+  xrt::bo* in_right_plf = new xrt::bo[tb.parallel_instances];
+  xrt::bo* out_plf = new xrt::bo[tb.parallel_instances];
+  for (unsigned int i = 0; i < tb.parallel_instances; i++) {
+    in_left_plf[i] = xrt::bo(in_left_buffer, tb.instance_size_left(), i*tb.instance_size_left());
+    in_right_plf[i] = xrt::bo(in_right_buffer, tb.instance_size_right(), i*tb.instance_size_right());
+    out_plf[i] = xrt::bo(out_buffer, tb.instance_size_out(), i*tb.instance_size_out());
+  }
+
   // Create the HLS kernel run handles and set the parameters
   xrt::run* mm2sleft_run = new xrt::run[tb.parallel_instances];
   xrt::run* mm2sright_run = new xrt::run[tb.parallel_instances];
   xrt::run* s2mm_run = new xrt::run[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     mm2sleft_run[i] = xrt::run(mm2sleft_kernels[i]);
-    mm2sleft_run[i].set_arg(0, in_left_buffer);
-    mm2sleft_run[i].set_arg(1, tb.alignment_sites);
+    mm2sleft_run[i].set_arg(0, in_left_plf[i]);
+    mm2sleft_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sleft_run[i].set_arg(2, tb.window_size);
 
     mm2sright_run[i] = xrt::run(mm2sright_kernels[i]);
-    mm2sright_run[i].set_arg(0, in_right_buffer);
-    mm2sright_run[i].set_arg(1, tb.alignment_sites);
+    mm2sright_run[i].set_arg(0, in_right_plf[i]);
+    mm2sright_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sright_run[i].set_arg(2, tb.window_size);
 
     s2mm_run[i] = xrt::run(s2mm_kernels[i]);
-    s2mm_run[i].set_arg(0, out_buffer);
-    s2mm_run[i].set_arg(1, tb.alignment_sites);
+    s2mm_run[i].set_arg(0, out_plf[i]);
+    s2mm_run[i].set_arg(1, tb.alignments_per_instance());
     s2mm_run[i].set_arg(2, tb.window_size);
   }
 
@@ -112,43 +122,72 @@ int main(int argc, char* argv[]) {
   //Check before run///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if !defined(NO_PRERUN_CHECK) || NO_PRERUN_CHECK == 0
-if(!prerun_check()){
-  exit(0);
-}
+  if(!prerun_check()){
+    exit(0);
+  }
 #endif
 
-  //Run///////////////////////////////////////////////////////////////////////////////////////////////////
 
-  auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
+  //Load data/////////////////////////////////////////////////////////////////////////////////////////////////
 
-  Timer t;
-  timing_data execution_ms(tb.plf_calls);
+  float** branchleft = new float*[tb.plf_calls];
+  float** branchright = new float*[tb.plf_calls];
+  float** ev = new float*[tb.plf_calls];
+  float** alignmentsleft = new float*[tb.plf_calls];
+  float** alignmentsright = new float*[tb.plf_calls];
 
-  float** dataOutput = new float*[tb.plf_calls];
-  float** checkOutput = new float*[tb.plf_calls];
   float** dataLeftInput = new float*[tb.plf_calls];
   float** dataRightInput = new float*[tb.plf_calls];
+  float** dataOutput = new float*[tb.plf_calls];
+
+  float** checkOutput = new float*[tb.plf_calls];
+
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
+    branchleft[i] = new float[64];
+    branchright[i] = new float[64];
+    ev[i] = new float[16];
+    alignmentsleft[i] = new float[tb.elements_per_plf() + tb.alignments_padding_elements()];
+    alignmentsright[i] = new float[tb.elements_per_plf() + tb.alignments_padding_elements()];
+
     dataOutput[i] = new float[tb.buffer_elements_out()];
     checkOutput[i] = new float[tb.buffer_elements_out()];
     dataLeftInput[i] = new float[tb.buffer_elements_left()];
     dataRightInput[i] = new float[tb.buffer_elements_right()];
-    for (unsigned long int j = 0; j < 80; j++) {
-      dataLeftInput[i][j] = (j%16)+1;
-      dataRightInput[i][j] = (j%16)+1;
+
+    // load ev
+    for (unsigned long int j = 0; j < 16; j++) {
+      ev[i][j] = j+1;
     }
-    if (tb.combined_ev) {
-      for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-        dataLeftInput[i][80+j] = (j % 4) + 1;
-        dataRightInput[i][80+j] = (j % 4) + 1;
-      }
-    } else {
-      for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-        dataLeftInput[i][80+j] = (j % 4) + 1;
-        dataRightInput[i][64+j] = (j % 4) + 1;
+    // load branch left and branch right
+    for (unsigned long int j = 0; j < 64; j++) {
+      branchleft[i][j] = (j%16)+1;
+      branchright[i][j] = (j%16)+1;
+    }
+    // load alignment data
+    for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
+      alignmentsleft[i][j] = (j % 4) + 1;
+      alignmentsright[i][j] = (j % 4) + 1;
+    }
+
+    for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+      std::copy(ev[i],         ev[i]+16,         dataLeftInput[i] + j*tb.instance_elements_left());
+      std::copy(branchleft[i], branchleft[i]+64, dataLeftInput[i] + 16 + j*tb.instance_elements_left());
+      std::copy(alignmentsleft[i] + j*tb.elements_per_instance(), alignmentsleft[i] + (j+1)*tb.elements_per_instance(), dataLeftInput[i] + 80 + j * tb.instance_elements_left());
+      if (tb.combined_ev) {
+        std::copy(ev[i], ev[i]+16, dataRightInput[i] + j*tb.instance_elements_right());
+        std::copy(branchright[i], branchright[i]+64, dataRightInput[i] + 16 + j*tb.instance_elements_right());
+        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 80 + j * tb.instance_elements_right());
+      } else {
+        std::copy(branchright[i], branchright[i]+64, dataRightInput[i] + j*tb.instance_elements_right());
+        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 64 + j * tb.instance_elements_right());
       }
     }
   }
+
+  //Run///////////////////////////////////////////////////////////////////////////////////////////////////
+  auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
+  Timer t;
+  timing_data execution_ms(tb.plf_calls);
 
 
   std::cout << "Start PLF calculation on accelerator ... " << std::endl;
@@ -196,19 +235,13 @@ if(!prerun_check()){
   // Test correctness of return data
   std::string result = "Passed";
   unsigned int errors = 0;
-  if (tb.combined_ev) {
-    for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-      reference_ms.t1[i] = t.elapsed();
-      plf(&dataLeftInput[i][80], &dataRightInput[i][80], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][16]);
-      reference_ms.t2[i] = t.elapsed();
-    }
-  } else {
-    for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-      reference_ms.t1[i] = t.elapsed();
-      plf(&dataLeftInput[i][80], &dataRightInput[i][64], &checkOutput[i][0], &dataLeftInput[i][0], tb.alignment_sites, &dataLeftInput[i][16], &dataRightInput[i][0]);
-      reference_ms.t2[i] = t.elapsed();
-    }
+
+  for (unsigned long int i = 0; i < tb.plf_calls; i++) {
+    reference_ms.t1[i] = t.elapsed();
+    plf(alignmentsleft[i], alignmentsright[i], checkOutput[i], ev[i], tb.alignment_sites, branchleft[i], branchright[i]);
+    reference_ms.t2[i] = t.elapsed();
   }
+
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
       if(dataOutput[i][j]!=checkOutput[i][j]) {
@@ -249,21 +282,48 @@ if(!prerun_check()){
     delete[] dataLeftInput[i];
     delete[] dataRightInput[i];
     delete[] dataOutput[i];
+    delete[] checkOutput[i];
+    delete[] branchleft[i];
+    delete[] branchright[i];
+    delete[] ev[i];
+    delete[] alignmentsleft[i];
+    delete[] alignmentsright[i];
   }
 
-  delete[] dataOutput;
   delete[] dataLeftInput;
   delete[] dataRightInput;
-  dataOutput = nullptr;
+  delete[] dataOutput;
+  delete[] checkOutput;
+  delete[] branchleft;
+  delete[] branchright;
+  delete[] ev;
+  delete[] alignmentsleft;
+  delete[] alignmentsright;
   dataLeftInput = nullptr;
   dataRightInput = nullptr;
+  dataOutput = nullptr;
+  checkOutput = nullptr;
+  branchleft = nullptr;
+  branchright = nullptr;
+  ev = nullptr;
+  alignmentsleft = nullptr;
+  alignmentsright = nullptr;
 
   delete[] mm2sleft_kernels;
   delete[] mm2sright_kernels;
   delete[] s2mm_kernels;
+  delete[] in_left_plf;
+  delete[] in_right_plf;
+  delete[] out_plf;
   delete[] mm2sleft_run;
   delete[] mm2sright_run;
   delete[] s2mm_run;
+  mm2sleft_kernels = nullptr;
+  mm2sright_kernels = nullptr;
+  s2mm_kernels = nullptr;
+  in_left_plf = nullptr;
+  in_right_plf = nullptr;
+  out_plf = nullptr;
   mm2sleft_run = nullptr;
   mm2sright_run = nullptr;
   s2mm_run = nullptr;

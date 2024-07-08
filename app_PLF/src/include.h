@@ -114,17 +114,58 @@ struct testbench_info {
   unsigned int plf_calls;
   unsigned int window_size;
   unsigned int combined_ev = 0;
-  //unsigned int num_plf_calls { return this->data_elements/(this->elements_per_plf()); }
 
-  unsigned int data_size() { return this->data_elements() * this->word_size; }
-  unsigned int data_elements() { return this->elements_per_plf() * plf_calls; }
+  unsigned long long int data_size() { return this->data_elements() * this->word_size; }
+  unsigned long long int data_elements() { return this->elements_per_instance() * this->parallel_instances * this->plf_calls; }
   unsigned int word_size = sizeof(float);
-  unsigned long long int ram_usage() { unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out()); return ram_per_plf*this->plf_calls; }
+
+  unsigned long long int ram_usage() {
+    unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out());
+    return ram_per_plf*this->plf_calls;
+  }
+
   unsigned int buffer_size_left()  { return this->word_size * this->buffer_elements_left(); }
   unsigned int buffer_size_right() { return this->word_size * this->buffer_elements_right(); }
   unsigned int buffer_size_out() { return this->word_size * this->buffer_elements_out(); }
-  unsigned int buffer_elements_left()  { return (this->elements_per_plf() + 5*16); }
-  unsigned int buffer_elements_right() { return combined_ev ? (this->elements_per_plf() + 5*16) : (this->elements_per_plf() + 4*16); }
-  unsigned int buffer_elements_out() { return this->elements_per_plf(); }
-  unsigned int elements_per_plf() { return this->alignment_sites * this->elements_per_alignment; }
+
+  unsigned int instance_size_left() { return this->word_size * this->instance_elements_left(); }
+  unsigned int instance_size_right() { return this->word_size * this->instance_elements_right(); }
+  unsigned int instance_size_out() { return this->word_size * this->instance_elements_out(); }
+
+  unsigned int alignments_per_instance() {
+    return std::ceil(alignment_sites/parallel_instances);
+  }
+  unsigned int alignments_padding() {
+    return (this->alignments_per_instance()*this->parallel_instances) - this->alignment_sites;
+  }
+  unsigned int alignments_padding_elements() {
+    return this->alignments_padding() * this->elements_per_alignment;
+  }
+
+  unsigned int buffer_elements_left()  {
+    return this->instance_elements_left() * this->parallel_instances;
+  }
+  unsigned int buffer_elements_right() {
+    return this->instance_elements_right() * this->parallel_instances;
+  }
+  unsigned int buffer_elements_out() {
+    return this->instance_elements_out() * this->parallel_instances;
+  }
+
+  unsigned int instance_elements_left() {
+    return this->elements_per_instance() + 5*16;
+  }
+  unsigned int instance_elements_right() {
+    return combined_ev ? this->elements_per_instance() + 5*16 : this->elements_per_instance() + 4*16;
+  }
+  unsigned int instance_elements_out() {
+    return this->elements_per_instance();
+  }
+
+  unsigned int elements_per_plf() {
+    return this->alignment_sites * this->elements_per_alignment;
+  }
+  unsigned int elements_per_instance() {
+    return this->alignments_per_instance() * this->elements_per_alignment;
+  }
 };
