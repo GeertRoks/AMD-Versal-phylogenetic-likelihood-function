@@ -25,17 +25,35 @@ extern "C" {
 #pragma HLS INTERFACE s_axilite port=window_size bundle=control
 #pragma HLS interface s_axilite port=return bundle=control
 
-    ap_uint<512> buffer = 0;
-    hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
+    // Add one padding alignment if alignments is odd, because read per 2 in AIE
+    unsigned int add_padding = (alignment_sites & 1);
 
     // Receive alignment site data
     for(unsigned int i = 0; i < alignment_sites; i++) {
 #pragma HLS PIPELINE II=1
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x = data_streams[j]->read();
-        buffer.range(127+j*128, j*128) = x.data;
-      }
+
+      ap_axiu<128,0,0,0> x[4];
+      ap_uint<512> buffer = 0;
+
+      x[0] = s0.read();
+      buffer.range(127, 0) = x[0].data;
+      x[1] = s1.read();
+      buffer.range(255, 128) = x[1].data;
+      x[2] = s2.read();
+      buffer.range(383, 256) = x[2].data;
+      x[3] = s3.read();
+      buffer.range(511, 384) = x[3].data;
+
+      // write combined data to memory
       mem[i] = buffer;
+    }
+
+    if (add_padding) {
+      ap_axiu<128,0,0,0> x[4];
+      x[0] = s0.read();
+      x[1] = s1.read();
+      x[2] = s2.read();
+      x[3] = s3.read();
     }
 
   }

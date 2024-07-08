@@ -37,9 +37,12 @@ extern "C" {
     transpose(mem[2], branchleft[2]);
     transpose(mem[3], branchleft[3]);
 
+    // Add one padding alignment if alignments is odd, because read per 2 in AIE
+    unsigned int add_padding = (alignment_sites & 1);
+
     // Put the number of alignemnts in a 128-bit packet
     ap_axiu<128,0,0,0> alignments_packet;
-    float alignments_float = static_cast<float>(alignment_sites);
+    float alignments_float = static_cast<float>(alignment_sites + add_padding);
     ap_uint<128> itr;
     itr.range(31, 0) = *reinterpret_cast<ap_uint<32>*>(&alignments_float);
     alignments_packet.data = itr;
@@ -84,14 +87,23 @@ extern "C" {
       ap_uint<512> buffer = mem[4+i];
 
       // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
+      ap_axiu<128,0,0,0> x[4];
+      x[0].data = buffer.range(127, 0);
+      s0.write(x[0]);
+      x[1].data = buffer.range(255, 128);
+      s1.write(x[1]);
+      x[2].data = buffer.range(383, 256);
+      s2.write(x[2]);
+      x[3].data = buffer.range(511, 384);
+      s3.write(x[3]);
+    }
+
+    if (add_padding) {
       ap_axiu<128,0,0,0> x;
-      x.data = buffer.range(127, 0);
+      x.data = 0;
       s0.write(x);
-      x.data = buffer.range(255, 128);
       s1.write(x);
-      x.data = buffer.range(383, 256);
       s2.write(x);
-      x.data = buffer.range(511, 384);
       s3.write(x);
     }
 
