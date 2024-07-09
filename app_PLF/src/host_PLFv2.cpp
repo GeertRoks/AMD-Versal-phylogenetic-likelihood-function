@@ -5,6 +5,8 @@
 #include "timing.h"
 #include "data.h"
 
+#include <random>
+
 int main(int argc, char* argv[]) {
 
   if(argc != 2)
@@ -28,6 +30,7 @@ int main(int argc, char* argv[]) {
   std::cout << "| plf calls per instance: | " << tb.plf_calls << std::endl;
   std::cout << "-----------------------------------------------------------------------" << std::endl;
   std::cout << "| alignment sites:        | " << tb.alignment_sites << std::endl;
+  std::cout << "| alignments per instance:| " << tb.alignments_per_instance() << std::endl;
   std::cout << "| data elements per site: | " << tb.elements_per_alignment << std::endl;
   std::cout << "| data elements per plf:  | " << tb.elements_per_plf() << std::endl;
   std::cout << "| AIE window size:        | " << tb.window_size << std::endl;
@@ -130,6 +133,10 @@ int main(int argc, char* argv[]) {
 
   //Load data/////////////////////////////////////////////////////////////////////////////////////////////////
 
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0f, 1.0f);
+
   float** branchleft = new float*[tb.plf_calls];
   float** branchright = new float*[tb.plf_calls];
   float** ev = new float*[tb.plf_calls];
@@ -156,30 +163,30 @@ int main(int argc, char* argv[]) {
 
     // load ev
     for (unsigned long int j = 0; j < 16; j++) {
-      ev[i][j] = j+1;
+      ev[i][j] = dis(gen);
     }
     // load branch left and branch right
     for (unsigned long int j = 0; j < 64; j++) {
-      branchleft[i][j] = (j%16)+1;
-      branchright[i][j] = (j%16)+1;
+      branchleft[i][j] = dis(gen);
+      branchright[i][j] = dis(gen);
     }
     // load alignment data
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-      alignmentsleft[i][j] = (j % 4) + 1;
-      alignmentsright[i][j] = (j % 4) + 1;
+      alignmentsleft[i][j] = dis(gen);
+      alignmentsright[i][j] = dis(gen);
     }
 
     for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
-      std::copy(ev[i],         ev[i]+16,         dataLeftInput[i] + j*tb.instance_elements_left());
-      std::copy(branchleft[i], branchleft[i]+64, dataLeftInput[i] + 16 + j*tb.instance_elements_left());
-      std::copy(alignmentsleft[i] + j*tb.elements_per_instance(), alignmentsleft[i] + (j+1)*tb.elements_per_instance(), dataLeftInput[i] + 80 + j * tb.instance_elements_left());
+      std::copy(ev[i],                                               ev[i]+16,                                              dataLeftInput[i] + j*tb.instance_elements_left()          );
+      std::copy(branchleft[i],                                       branchleft[i]+64,                                      dataLeftInput[i] + 16 + j*tb.instance_elements_left()     );
+      std::copy(alignmentsleft[i] + j*tb.elements_per_instance(),    alignmentsleft[i] + (j+1)*tb.elements_per_instance(),  dataLeftInput[i] + 80 + j * tb.instance_elements_left()   );
       if (tb.combined_ev) {
-        std::copy(ev[i], ev[i]+16, dataRightInput[i] + j*tb.instance_elements_right());
-        std::copy(branchright[i], branchright[i]+64, dataRightInput[i] + 16 + j*tb.instance_elements_right());
-        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 80 + j * tb.instance_elements_right());
+        std::copy(ev[i],                                             ev[i]+16,                                              dataRightInput[i] + j*tb.instance_elements_right()        );
+        std::copy(branchright[i],                                    branchright[i]+64,                                     dataRightInput[i] + 16 + j*tb.instance_elements_right()   );
+        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 80 + j * tb.instance_elements_right() );
       } else {
-        std::copy(branchright[i], branchright[i]+64, dataRightInput[i] + j*tb.instance_elements_right());
-        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 64 + j * tb.instance_elements_right());
+        std::copy(branchright[i],                                    branchright[i]+64,                                     dataRightInput[i] + j*tb.instance_elements_right()        );
+        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 64 + j * tb.instance_elements_right() );
       }
     }
   }
@@ -278,6 +285,7 @@ int main(int argc, char* argv[]) {
 
   //Cleanup////////////////////////////////////////////////////////////////////////////////////////////////
 
+  std::cout << "delete inner data arrays" << std::endl;
   for (unsigned int i = 0; i < tb.plf_calls; i++) {
     delete[] dataLeftInput[i];
     delete[] dataRightInput[i];
@@ -290,6 +298,7 @@ int main(int argc, char* argv[]) {
     delete[] alignmentsright[i];
   }
 
+  std::cout << "delete data arrays" << std::endl;
   delete[] dataLeftInput;
   delete[] dataRightInput;
   delete[] dataOutput;
@@ -309,6 +318,7 @@ int main(int argc, char* argv[]) {
   alignmentsleft = nullptr;
   alignmentsright = nullptr;
 
+  std::cout << "delete handles" << std::endl;
   delete[] mm2sleft_kernels;
   delete[] mm2sright_kernels;
   delete[] s2mm_kernels;
