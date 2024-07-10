@@ -267,16 +267,8 @@ int main(int argc, char* argv[]) {
 
   std::cout << std::endl;
   std::cout << "Test result: " << result << std::endl;
-  print_timing_data(execution_ms, (double)tb.data_size());
+  print_timing_data(execution_ms, reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls);
 
-  std::cout << "==========================================================================" << std::endl;
-  std::cout << "| Reference:                             | " << std::setw(10) << reference_ms.msm() << " | ";
-  std::cout << std::setw(16) << ((double)tb.data_size() / (reference_ms.msm()))/1000.0f << " |" << std::endl;
-  std::cout << "|----------------------------------------+------------+------------------|" << std::endl;
-  std::cout << "| Speed up:                                           | ";
-  std::cout << std::setw(16) << reference_ms.msm()/execution_ms.msm() << " | " << std::endl;
-  std::cout << "==========================================================================" << std::endl;
-  std::cout << std::endl;
 
   //if (acap.get_target() == "hw") {
   //  std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_freq" + STRINGIFY(PL_FREQ) + "_plfs" + STRINGIFY(tb.plf_calls) + ".csv";

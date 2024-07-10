@@ -76,26 +76,44 @@ struct timing_data {
   };
 };
 
-double bandwidth(double time_ms, double data_size) {
+double bandwidth_MBs(double time_ms, double data_size) {
   return ((double)data_size / (time_ms))/1000.0f; //MB per second
 }
-void print_timing_data(timing_data d, double data_size) {
+unsigned long int bandwidth_As(double time_ms, double alignments) {
+  return (unsigned long int)((double)alignments / (time_ms/1000.0f)); //Alignments per second
+}
+void print_timing_data(timing_data d, timing_data r, double data_size, unsigned int alignments) {
   std::cout << std::endl;
-  std::cout << "==========================================================================" << std::endl;
-  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) |" << std::endl;
-  std::cout << "==========================================================================" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) | bandwidth (alignments/s) |" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
   std::cout << "| Host to ACAP memory:                   | " << std::setw(10) << d.hm() << " | ";
-  std::cout << std::setw(16) << bandwidth(d.hm(), data_size)    << " |" << std::endl;
+  std::cout << std::setw(16) << bandwidth_MBs(d.hm(), data_size)    << " | ";
+  std::cout << std::setw(24) << bandwidth_As(d.hm(), alignments) << " |" << std::endl;
   if (d.msm() > 0.005) {
     std::cout << "| ACAP memory to PL/AIE to ACAP memory:  | " << std::setw(10) << d.msm() << " | ";
-    std::cout << std::setw(16) << bandwidth(d.msm(), data_size)   << " |" << std::endl;
+    std::cout << std::setw(16) << bandwidth_MBs(d.msm(), data_size)   << " | ";
+    std::cout << std::setw(24) << bandwidth_As(d.msm(), alignments) << " |" << std::endl;
   }
   std::cout << "| ACAP memory to host:                   | " << std::setw(10) << d.mh() << " | ";
-  std::cout << std::setw(16) << bandwidth(d.mh(), data_size)    << " |" << std::endl;
-  std::cout << "|----------------------------------------+------------+------------------|" << std::endl;
+  std::cout << std::setw(16) << bandwidth_MBs(d.mh(), data_size)    << " | ";
+    std::cout << std::setw(24) << bandwidth_As(d.mh(), alignments) << " |" << std::endl;
+  std::cout << "|----------------------------------------+------------+------------------+--------------------------|" << std::endl;
   std::cout << "| Total execution time:                  | " << std::setw(10) << d.total() << " | ";
-  std::cout << std::setw(16) << bandwidth(d.total(), data_size) << " |" << std::endl;
-  std::cout << "==========================================================================" << std::endl;
+  std::cout << std::setw(16) << bandwidth_MBs(d.total(), data_size) << " | ";
+  std::cout << std::setw(24) << bandwidth_As(d.total(), alignments) << " |" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  std::cout << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  std::cout << "| Reference:                             | " << std::setw(10) << r.msm() << " | ";
+  std::cout << std::setw(16) << (data_size / (r.msm()))/1000.0f << " | ";
+  std::cout << std::setw(24) << (unsigned long int)(alignments / (r.msm()/1000.0f)) << " |" << std::endl;
+  std::cout << "|----------------------------------------+------------+------------------+--------------------------|" << std::endl;
+  std::cout << "| Speed up (excluding pcie transfer):    | ";
+  std::cout << std::setw(56) << r.msm()/d.msm() << " |" << std::endl;;
+  std::cout << "| Speed up (including pcie transfer):    | ";
+  std::cout << std::setw(56) << r.msm()/d.total() << " |" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
   std::cout << std::endl;
 }
 
