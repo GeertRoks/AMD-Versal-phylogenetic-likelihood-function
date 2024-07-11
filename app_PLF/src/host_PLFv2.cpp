@@ -20,47 +20,63 @@ int main(int argc, char* argv[]) {
   tb.combined_ev = 0;
   tb.parallel_instances = 1;
 
-  std::cout << std::endl;
-  std::cout << "=======================================================================" << std::endl;
-  std::cout << "| test name:              | " << acap.get_app_name() << std::endl;
-  std::cout << "| PL name:                | " << acap.get_pl_name() << std::endl;
-  std::cout << "| AIE name:               | " << acap.get_aie_name() << std::endl;
-  std::cout << "=======================================================================" << std::endl;
-  std::cout << "| parallel plfs:          | " << tb.parallel_instances << std::endl;
-  std::cout << "| plf calls per instance: | " << tb.plf_calls << std::endl;
-  std::cout << "-----------------------------------------------------------------------" << std::endl;
-  std::cout << "| alignment sites:        | " << tb.alignment_sites << std::endl;
-  std::cout << "| alignments per instance:| " << tb.alignments_per_instance() << std::endl;
-  std::cout << "| data elements per site: | " << tb.elements_per_alignment << std::endl;
-  std::cout << "| data elements per plf:  | " << tb.elements_per_plf() << std::endl;
-  std::cout << "| AIE window size:        | " << tb.window_size << std::endl;
-  std::cout << "-----------------------------------------------------------------------" << std::endl;
-  std::cout << "| data size:              | " << tb.data_size() << std::endl;
-  std::cout << "| data elements:          | " << tb.data_elements() << std::endl;
-  std::cout << "| word size:              | " << tb.word_size << std::endl;
-  std::cout << "-----------------------------------------------------------------------" << std::endl;
-  std::cout << "| buffer size left:       | " << tb.buffer_size_left() << std::endl;
-  std::cout << "| buffer size right:      | " << tb.buffer_size_right() << std::endl;
-  std::cout << "| buffer size out:        | " << tb.buffer_size_out() << std::endl;
-  std::cout << "-----------------------------------------------------------------------" << std::endl;
-  std::cout << "| buffer elements left:   | " << tb.buffer_elements_left() << std::endl;
-  std::cout << "| buffer elements right:  | " << tb.buffer_elements_right() << std::endl;
-  std::cout << "| buffer elements out:    | " << tb.buffer_elements_out() << std::endl;
-  std::cout << "=======================================================================" << std::endl;
-  std::cout << "| RAM usage:              | " << tb.ram_usage()/1000000000.0 << " GB of 256 GB (" << tb.ram_usage()/256000000000.0 << "% )" << std::endl;
-  std::cout << "=======================================================================" << std::endl;
-  std::cout << "| device name:            | " << acap.get_device()->get_info<xrt::info::device::name>() << std::endl;
-  std::cout << "| device bdf:             | " << acap.get_device()->get_info<xrt::info::device::bdf>() << std::endl;
-  std::cout << "-----------------------------------------------------------------------" << std::endl;
-  std::cout << "| xclbin host_type:       | " << acap.get_target() << std::endl;
+  std::cout << std::left << std::endl;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << "| test name:              | " << std::setw(54) << acap.get_app_name() << " |" << std::endl;
+  std::cout << "| PL name:                | " << std::setw(54) << acap.get_pl_name() << " |" << std::endl;
+  std::cout << "| AIE name:               | " << std::setw(54) << acap.get_aie_name() << " |" << std::endl;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << "| alignment sites:        | " << std::setw(54) << tb.alignment_sites << " |" << std::endl;
+  std::cout << "| plf calls:              | " << std::setw(54) << tb.plf_calls << " |" << std::endl;
+  std::cout << "| parallel plfs:          | " << std::setw(54) << tb.parallel_instances << " |" << std::endl;
+  std::cout << "------------------------------------------------------------------------------------" << std::endl;
+  std::cout << "| AIE window size:        | " << std::setw(54) << tb.window_size << " |" << std::endl;
+  std::cout << std::right;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << "|                         |       alignments |         elements |     size (bytes) |" << std::endl;
+  std::cout << "|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |" << std::endl;
+  std::cout << "| instance left:          | " << std::setw(16) << tb.alignments_per_instance() << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_elements_left()  << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_size_left()      << " |" << std::endl;
+  std::cout << "| instance right:         | " << std::setw(16) << tb.alignments_per_instance() << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_elements_right() << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_size_right()     << " |" << std::endl;
+  std::cout << "| instance out:           | " << std::setw(16) << tb.alignments_per_instance() << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_elements_out()   << " | ";
+  std::cout <<                                   std::setw(16) << tb.instance_size_out()       << " |" << std::endl;
+  std::cout << "------------------------------------------------------------------------------------" << std::endl;
+  std::cout << "| buffer left:            | " << std::setw(16) << tb.alignment_sites         << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_elements_left()  << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_size_left()      << " |" << std::endl;
+  std::cout << "| buffer right:           | " << std::setw(16) << tb.alignment_sites         << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_elements_right() << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_size_right()     << " |" << std::endl;
+  std::cout << "| buffer out:             | " << std::setw(16) << tb.alignment_sites         << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_elements_out()   << " | ";
+  std::cout <<                                   std::setw(16) << tb.buffer_size_out()       << " |" << std::endl;
+  std::cout << "------------------------------------------------------------------------------------" << std::endl;
+  std::cout << "| total (" << std::setw(3) << tb.plf_calls << " plf calls):  | " << std::setw(16) << tb.alignment_sites * tb.plf_calls << " | ";
+  std::cout <<                                   std::setw(16) << tb.data_elements()                << " | ";
+  std::cout <<                                   std::setw(16) << tb.data_size()                    << " |" << std::endl;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << "| RAM usage (host):       | " << std::setw(14) << tb.host_mem_usage()/1000000000.0 << " GB of 256 GB (";
+  std::cout << std::setw(12) << tb.host_mem_usage()/256000000000.0 << " % )" << std::setw(11) << " |" << std::endl;
+  std::cout << "| RAM usage (Versal):     | " << std::setw(14) << tb.acap_mem_usage()/1000000000.0 << " GB of   4 GB (";
+  std::cout << std::setw(12) << tb.acap_mem_usage()/4000000000.0 << " % )" << std::setw(11) << " |" << std::endl;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << std::left;
+  std::cout << "| device name:            | " << std::setw(54) << acap.get_device()->get_info<xrt::info::device::name>() << " |" << std::endl;
+  std::cout << "| device bdf:             | " << std::setw(54) << acap.get_device()->get_info<xrt::info::device::bdf>() << " |" << std::endl;
+  std::cout << "------------------------------------------------------------------------------------" << std::endl;
+  std::cout << "| xclbin host_type:       | " << std::setw(54) << acap.get_target() << " |" << std::endl;
   std::cout << "| xclbin kernels:         | ";
   for (auto kernel : acap.get_kernels()) {
     std::cout << kernel.get_name() << " ";
   }
   std::cout << std::endl;
   //std::cout << "| xclbin uuid:         | " << xclbin.get_uuid().to_string() << std::endl;
-  std::cout << "=======================================================================" << std::endl;
-  std::cout << std::endl;
+  std::cout << "====================================================================================" << std::endl;
+  std::cout << std::right << std::endl;
 
 
 
@@ -267,7 +283,7 @@ int main(int argc, char* argv[]) {
 
   std::cout << std::endl;
   std::cout << "Test result: " << result << std::endl;
-  print_timing_data(execution_ms, reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls);
+  print_timing_data(execution_ms, reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
 
 
   //if (acap.get_target() == "hw") {

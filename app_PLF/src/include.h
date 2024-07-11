@@ -119,8 +119,12 @@ struct testbench_info {
   unsigned long long int data_elements() { return this->elements_per_instance() * this->parallel_instances * this->plf_calls; }
   unsigned int word_size = sizeof(float);
 
-  unsigned long long int ram_usage() {
-    unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out());
+  unsigned long long int acap_mem_usage() {
+    unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out());
+    return ram_per_plf*this->plf_calls;
+  }
+  unsigned long long int host_mem_usage() {
+    unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out()+64+64+16+(2*(this->elements_per_plf()+this->alignments_padding_elements())));
     return ram_per_plf*this->plf_calls;
   }
 
