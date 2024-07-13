@@ -36,12 +36,12 @@ extern "C" {
       ap_uint<512> buffer = 0;
 
       x[0] = s0.read();
-      buffer.range(127, 0) = x[0].data;
       x[1] = s1.read();
-      buffer.range(255, 128) = x[1].data;
       x[2] = s2.read();
-      buffer.range(383, 256) = x[2].data;
       x[3] = s3.read();
+      buffer.range(127, 0) = x[0].data;
+      buffer.range(255, 128) = x[1].data;
+      buffer.range(383, 256) = x[2].data;
       buffer.range(511, 384) = x[3].data;
 
       // write combined data to memory

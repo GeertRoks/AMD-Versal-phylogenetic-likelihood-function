@@ -28,6 +28,9 @@ extern "C" {
 
     // read ev matrix
     ap_uint<512> ev = mem[0];
+    ap_axiu<128,0,0,0> ev_packet[2];
+    ev_packet[0].data = ev.range(383, 256);
+    ev_packet[1].data = ev.range(511, 384);
 
     // read branch matrices and transpose them
     ap_uint<512> branchleft[4] = {0,0,0,0};
@@ -53,18 +56,14 @@ extern "C" {
     s3.write(alignments_packet);
 
     // load bottom half of EV matrix
-    // (16 elem * 32 = 512 bits / 512 bits = 1 mem read with 4 128-bit stream writes each (4 total))
-    ap_axiu<128,0,0,0> y;
-    y.data = ev.range(383, 256);
-    s0.write(y);
-    s1.write(y);
-    s2.write(y);
-    s3.write(y);
-    y.data = ev.range(511, 384);
-    s0.write(y);
-    s1.write(y);
-    s2.write(y);
-    s3.write(y);
+    s0.write(ev_packet[0]);
+    s1.write(ev_packet[0]);
+    s2.write(ev_packet[0]);
+    s3.write(ev_packet[0]);
+    s0.write(ev_packet[1]);
+    s1.write(ev_packet[1]);
+    s2.write(ev_packet[1]);
+    s3.write(ev_packet[1]);
 
     // Split the branch matrix and send them to each branch stream individually
     // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
@@ -102,12 +101,12 @@ extern "C" {
       // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
       ap_axiu<128,0,0,0> x[4];
       x[0].data = buffer.range(127, 0);
-      s0.write(x[0]);
       x[1].data = buffer.range(255, 128);
-      s1.write(x[1]);
       x[2].data = buffer.range(383, 256);
-      s2.write(x[2]);
       x[3].data = buffer.range(511, 384);
+      s0.write(x[0]);
+      s1.write(x[1]);
+      s2.write(x[2]);
       s3.write(x[3]);
     }
 
