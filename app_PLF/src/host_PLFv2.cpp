@@ -60,9 +60,9 @@ int main(int argc, char* argv[]) {
   std::cout <<                                   std::setw(16) << tb.data_size()                    << " |" << std::endl;
   std::cout << "====================================================================================" << std::endl;
   std::cout << "| RAM usage (host):       | " << std::setw(14) << tb.host_mem_usage()/1000000000.0 << " GB of 256 GB (";
-  std::cout << std::setw(12) << tb.host_mem_usage()/256000000000.0 << " % )" << std::setw(11) << " |" << std::endl;
-  std::cout << "| RAM usage (Versal):     | " << std::setw(14) << tb.acap_mem_usage()/1000000000.0 << " GB of   4 GB (";
-  std::cout << std::setw(12) << tb.acap_mem_usage()/4000000000.0 << " % )" << std::setw(11) << " |" << std::endl;
+  std::cout << std::setw(12) << tb.host_mem_usage()/2560000000.0 << " % )" << std::setw(11) << " |" << std::endl;
+  std::cout << "| RAM usage (Versal):     | " << std::setw(14) << tb.acap_mem_usage()/1000000000.0 << " GB of  12 GB (";
+  std::cout << std::setw(12) << tb.acap_mem_usage()/120000000.0 << " % )" << std::setw(11) << " |" << std::endl;
   std::cout << "====================================================================================" << std::endl;
   std::cout << std::left;
   std::cout << "| device name:            | " << std::setw(54) << acap.get_device()->get_info<xrt::info::device::name>() << " |" << std::endl;

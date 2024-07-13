@@ -99,6 +99,8 @@ else ifeq ($(PL_TYPE),stream1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
 else ifeq ($(PL_TYPE),stream1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
+else ifeq ($(PL),genstream1inEV)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 endif
 
 #v++ flags
@@ -143,6 +145,8 @@ all: xclbin host
 
 host: $(DIR_BUILD)/$(TARGET)/host.exe
 
+host_gen: $(DIR_BUILD)/$(TARGET)/host_gen.exe
+
 xclbin: $(XCLBIN)
 
 xsa: $(XSA)
@@ -162,6 +166,9 @@ CHUNK_SIZE ?= 1048576
 CHUNK_SIZES ?= 1048576 2097152 4194304
 BUFFER_SIZES ?= 33554432
 
+run_hw_gen:
+	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN)
+
 run_hw:
 	$(DIR_BUILD)/hw/host.exe $(XCLBIN)
 
@@ -171,6 +178,16 @@ run_hw_tests:
 			$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$buf $$chunk; \
 		done; \
 	done
+
+run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
+	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
+	@echo "Project root $(PROJECT_ROOT)"
+	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
+	export XCL_EMULATION_MODE=sw_emu; \
+	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
+	cd $(DIR_EMU_LOGS)/sw_emu; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	cd -
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
@@ -198,6 +215,10 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 #	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
 
 $(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+	$(dir_guard)
+	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
+
+$(DIR_BUILD)/$(TARGET)/host_gen.exe: $(DIR_HOST)/src/host_gen.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 

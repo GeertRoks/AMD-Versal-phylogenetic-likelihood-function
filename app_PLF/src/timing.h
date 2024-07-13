@@ -100,7 +100,7 @@ struct timing_data {
 };
 
 double bandwidth_MBs(double time_ms, double data_size) {
-  return ((double)data_size / (time_ms))/1000.0f; //MB per second
+  return ((data_size/1000000.0f) / (time_ms/1000.0f)); //MB per second
 }
 unsigned long int bandwidth_As(double time_ms, double alignments) {
   return (unsigned long int)((double)alignments / (time_ms/1000.0f)); //Alignments per second

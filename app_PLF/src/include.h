@@ -115,8 +115,8 @@ struct testbench_info {
   unsigned int window_size;
   unsigned int combined_ev = 0;
 
-  unsigned long long int data_size() { return this->data_elements() * this->word_size; }
-  unsigned long long int data_elements() { return this->elements_per_instance() * this->parallel_instances * this->plf_calls; }
+  unsigned long long int data_size() { return (unsigned long long int) this->data_elements() * this->word_size; }
+  unsigned long long int data_elements() { return (unsigned long long int) this->elements_per_instance() * this->parallel_instances * this->plf_calls; }
   unsigned int word_size = sizeof(float);
 
   unsigned long long int acap_mem_usage() {
