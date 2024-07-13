@@ -99,6 +99,8 @@ else ifeq ($(PL_TYPE),stream1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
 else ifeq ($(PL_TYPE),stream1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
+else ifeq ($(PL),genwindow1inEV)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 else ifeq ($(PL),genstream1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 endif
@@ -111,7 +113,7 @@ VPP_PACKAGE_FLAGS := --package.boot_mode ospi --package.out_dir $(DIR_BUILD)/$(T
 VPP_INTERMEDIATE_FILE_DIRS := --save-temps --temp_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/temp --report_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/reports --log_dir $(DIR_BUILD)/$(TARGET)/_x_$(PL)_$(AIE)/logs
 VPP_HLS_FLAGS := --hls.jobs 8
 
-GCC_HOST_FLAGS := -g -Wall -std=c++17 -DAIE=$(AIE) -DPL=$(PL)
+GCC_HOST_FLAGS := -g -Wall -std=c++17
 GCC_HOST_INCLUDES := -I$(DIR_HOST)/src -I${XILINX_XRT}/include -L${XILINX_XRT}/lib
 GCC_HOST_LIBS := -lxrt_coreutil -luuid -pthread
 
@@ -167,7 +169,14 @@ CHUNK_SIZES ?= 1048576 2097152 4194304
 BUFFER_SIZES ?= 33554432
 
 run_hw_gen:
-	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN)
+	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
+
+ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
+
+run_hw_gen_tests:
+	for alignments in $(ALIGNMENT_SITES); do\
+		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments; \
+	done
 
 run_hw:
 	$(DIR_BUILD)/hw/host.exe $(XCLBIN)

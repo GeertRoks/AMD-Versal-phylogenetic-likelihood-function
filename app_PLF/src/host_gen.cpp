@@ -9,12 +9,18 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 2)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin>\n");
+  if(argc != 3)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=10000000;
+  try {
+    tb.alignment_sites = std::stoul(argv[2]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for alignment_sites: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(alignment sites) out of range" << std::endl;
+  }
   tb.plf_calls = 100;
   tb.window_size = 1024;
   tb.combined_ev = 1;
@@ -133,10 +139,10 @@ int main(int argc, char* argv[]) {
   print_timing_data(execution_ms, reference_ms, (double) tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
 
 
-  //if (acap.get_target() == "hw") {
-  //  std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_freq" + STRINGIFY(PL_FREQ) + "_plfs" + STRINGIFY(tb.plf_calls) + ".csv";
-  //  //write_to_csv(csvFile, execution_ms);
-  //}
+  if (acap.get_target() == "hw") {
+    std::string csvFile = std::string("data_hw_pl_generator_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + tb.plf_calls + "_alignments" + tb.alignment_sites + "_usedgraphs" + tb.parallel_instances + ".csv";
+    write_to_csv(csvFile, execution_ms);
+  }
 
   //Cleanup////////////////////////////////////////////////////////////////////////////////////////////////
 
