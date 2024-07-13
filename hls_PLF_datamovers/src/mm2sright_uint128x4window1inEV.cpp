@@ -28,94 +28,139 @@ extern "C" {
 
     // read ev matrix
     ap_uint<512> ev = mem[0];
+    ap_axiu<128,0,0,0> ev_packet[2];
+    ev_packet[0].data = ev.range(383, 256);
+    ev_packet[1].data = ev.range(511, 384);
 
     // read branch matrices and transpose them
-    ap_uint<512> branchleft[4] = {0,0,0,0};
-    transpose(mem[0], branchleft[0]);
-    transpose(mem[1], branchleft[1]);
-    transpose(mem[2], branchleft[2]);
-    transpose(mem[3], branchleft[3]);
+    ap_uint<512> branch[4] = {0,0,0,0};
+    transpose(mem[1], branch[0]);
+    transpose(mem[2], branch[1]);
+    transpose(mem[3], branch[2]);
+    transpose(mem[4], branch[3]);
 
     // (window_size/4 bytes per value)/4 values per alignment -> div by 16
     const unsigned int alignments_per_window = (window_size>>4);
-    const unsigned int num_windows = (alignment_sites+alignments_per_window-1)/alignments_per_window;
+    const unsigned int num_full_windows = alignment_sites/alignments_per_window;
+    const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
 
     // calculate if alignment sites fits in the windows or if extention by zeroes is needed
-    unsigned int quotient = alignment_sites/alignments_per_window;
-    unsigned int product = quotient*alignments_per_window;
-    unsigned int remainder = alignment_sites - product;
+    //unsigned int quotient = alignment_sites/alignments_per_window;
+    //unsigned int product = quotient*alignments_per_window;
+    //unsigned int remainder = alignment_sites - product;
 
-    for(unsigned int window = 0; window < num_windows; window++) {
+    for(unsigned int window = 0; window < num_full_windows; window++) {
 
       // load bottom half of EV matrix
-      // (16 elem * 32 = 512 bits / 512 bits = 1 mem read with 4 128-bit stream writes each (4 total))
-      ap_axiu<128,0,0,0> y;
-      y.data = ev.range(383, 256);
-      s0.write(y);
-      s1.write(y);
-      s2.write(y);
-      s3.write(y);
-      y.data = ev.range(511, 384);
-      s0.write(y);
-      s1.write(y);
-      s2.write(y);
-      s3.write(y);
+      s0.write(ev_packet[0]);
+      s1.write(ev_packet[0]);
+      s2.write(ev_packet[0]);
+      s3.write(ev_packet[0]);
+      s0.write(ev_packet[1]);
+      s1.write(ev_packet[1]);
+      s2.write(ev_packet[1]);
+      s3.write(ev_packet[1]);
 
       // Split the branch matrix and prepend them to each data stream
       // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
       for(unsigned int j = 0; j < 4; j++) {
         ap_axiu<128,0,0,0> x;
-        x.data = branchleft[0].range(127 + j*128, j*128);
+        x.data = branch[0].range(127 + j*128, j*128);
         s0.write(x);
       }
       for(unsigned int j = 0; j < 4; j++) {
         ap_axiu<128,0,0,0> x;
-        x.data = branchleft[1].range(127 + j*128, j*128);
+        x.data = branch[1].range(127 + j*128, j*128);
         s1.write(x);
       }
       for(unsigned int j = 0; j < 4; j++) {
         ap_axiu<128,0,0,0> x;
-        x.data = branchleft[2].range(127 + j*128, j*128);
+        x.data = branch[2].range(127 + j*128, j*128);
         s2.write(x);
       }
       for(unsigned int j = 0; j < 4; j++) {
         ap_axiu<128,0,0,0> x;
-        x.data = branchleft[3].range(127 + j*128, j*128);
+        x.data = branch[3].range(127 + j*128, j*128);
         s3.write(x);
       }
 
       // Send branch matrix and alignment site data for a window
       for(unsigned int i = 0; i < alignments_per_window; i++) {
-        if (window >= num_windows-1 && remainder > 0 && i >= remainder) {
-          // add zeroes to the input stream if alignments does not fit exactly in the last aie window
-          ap_axiu<128,0,0,0> x;
-          x.data = 0;
-          s0.write(x);
-          s1.write(x);
-          s2.write(x);
-          s3.write(x);
-
-        } else {
-          // read all 16 values of one alignement
-          // ((512 bits read/8 bits per byte)/4 bytes per float = 16 values)
-          ap_uint<512> buffer = mem[5+(alignments_per_window*window)+i];
-          // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
-          ap_axiu<128,0,0,0> x;
-          x.data = buffer.range(127, 0);
-          s0.write(x);
-          x.data = buffer.range(255, 128);
-          s1.write(x);
-          x.data = buffer.range(383, 256);
-          s2.write(x);
-          x.data = buffer.range(511, 384);
-          s3.write(x);
-        }
-
+        // read all 16 values of one alignement
+        // ((512 bits read/8 bits per byte)/4 bytes per float = 16 values)
+        ap_uint<512> buffer = mem[5+(alignments_per_window*window)+i];
+        // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
+        ap_axiu<128,0,0,0> x[4];
+        x[0].data = buffer.range(127, 0);
+        x[1].data = buffer.range(255, 128);
+        x[2].data = buffer.range(383, 256);
+        x[3].data = buffer.range(511, 384);
+        s0.write(x[0]);
+        s1.write(x[1]);
+        s2.write(x[2]);
+        s3.write(x[3]);
       }
-
     }
 
-  }
+    if (remainder > 0) {
+      // load bottom half of EV matrix
+      s0.write(ev_packet[0]);
+      s1.write(ev_packet[0]);
+      s2.write(ev_packet[0]);
+      s3.write(ev_packet[0]);
+      s0.write(ev_packet[1]);
+      s1.write(ev_packet[1]);
+      s2.write(ev_packet[1]);
+      s3.write(ev_packet[1]);
 
-}
+      // Split the branch matrix and prepend them to each data stream
+      // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
+      for(unsigned int j = 0; j < 4; j++) {
+        ap_axiu<128,0,0,0> x;
+        x.data = branch[0].range(127 + j*128, j*128);
+        s0.write(x);
+      }
+      for(unsigned int j = 0; j < 4; j++) {
+        ap_axiu<128,0,0,0> x;
+        x.data = branch[1].range(127 + j*128, j*128);
+        s1.write(x);
+      }
+      for(unsigned int j = 0; j < 4; j++) {
+        ap_axiu<128,0,0,0> x;
+        x.data = branch[2].range(127 + j*128, j*128);
+        s2.write(x);
+      }
+      for(unsigned int j = 0; j < 4; j++) {
+        ap_axiu<128,0,0,0> x;
+        x.data = branch[3].range(127 + j*128, j*128);
+        s3.write(x);
+      }
+      for(unsigned int i = 0; i < remainder; i++) {
+        // read all 16 values of one alignement
+        // ((512 bits read/8 bits per byte)/4 bytes per float = 16 values)
+        ap_uint<512> buffer = mem[5+(alignments_per_window*num_full_windows)+i];
+        // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
+        ap_axiu<128,0,0,0> x[4];
+        x[0].data = buffer.range(127, 0);
+        x[1].data = buffer.range(255, 128);
+        x[2].data = buffer.range(383, 256);
+        x[3].data = buffer.range(511, 384);
+        s0.write(x[0]);
+        s1.write(x[1]);
+        s2.write(x[2]);
+        s3.write(x[3]);
+      }
+      // add zeroes to the input stream if alignments does not fit exactly in the last aie window
+      for(unsigned int i = remainder; i < alignments_per_window; i++) {
+        ap_axiu<128,0,0,0> x;
+        x.data = 0;
+        s0.write(x);
+        s1.write(x);
+        s2.write(x);
+        s3.write(x);
+      }
+    }
 
+  } // void mm2sright()
+
+} // extern "C"
