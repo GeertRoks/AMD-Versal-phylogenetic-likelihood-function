@@ -103,9 +103,14 @@ else ifeq ($(PL),genwindow1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
 else ifeq ($(PL),genstream1inEV)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
+else ifeq ($(PL),genwindow2in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
+else ifeq ($(PL),genstream2in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
 endif
 
 #v++ flags
+VPP_PROFILE_FLAGS := --profile.stall=all:all:all --profile.data=all:all:all
 #VPP_PROFILE_FLAGS := --profile.aie=all --profile.stall=all:all:all --profile.data=all:all:all --profile.exec=all:all
 VPP_VIVADO_FLAGS := --vivado.impl.jobs 8 --vivado.synth.jobs 8
 VPP_PACKAGE_FLAGS := --package.boot_mode ospi --package.out_dir $(DIR_BUILD)/$(TARGET)/package
@@ -149,6 +154,8 @@ host: $(DIR_BUILD)/$(TARGET)/host.exe
 
 host_gen: $(DIR_BUILD)/$(TARGET)/host_gen.exe
 
+host_pcie: $(DIR_BUILD)/$(TARGET)/host_pcie.exe
+
 xclbin: $(XCLBIN)
 
 xsa: $(XSA)
@@ -167,6 +174,9 @@ CHUNK_SIZE ?= 1048576
 
 CHUNK_SIZES ?= 1048576 2097152 4194304
 BUFFER_SIZES ?= 33554432
+
+run_hw_pcie:
+	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
 
 run_hw_gen:
 	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
@@ -188,6 +198,26 @@ run_hw_tests:
 		done; \
 	done
 
+run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
+	@echo "Running hw_emu @ $(CURRENT_DATE_TIME)"
+	@echo "Project root $(PROJECT_ROOT)"
+	@mkdir -p $(DIR_EMU_LOGS)/hw_emu
+	export XCL_EMULATION_MODE=hw_emu; \
+	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
+	cd $(DIR_EMU_LOGS)/hw_emu; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	cd -
+
+run_sw_emu_pcie: $(DIR_BUILD)/sw_emu/emconfig.json
+	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
+	@echo "Project root $(PROJECT_ROOT)"
+	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
+	export XCL_EMULATION_MODE=sw_emu; \
+	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
+	cd $(DIR_EMU_LOGS)/sw_emu; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_pcie.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	cd -
+
 run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
 	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
 	@echo "Project root $(PROJECT_ROOT)"
@@ -195,7 +225,7 @@ run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
 	cd -
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
@@ -228,6 +258,10 @@ $(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
 $(DIR_BUILD)/$(TARGET)/host_gen.exe: $(DIR_HOST)/src/host_gen.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+	$(dir_guard)
+	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
+
+$(DIR_BUILD)/$(TARGET)/host_pcie.exe: $(DIR_HOST)/src/host_pcie.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
@@ -265,6 +299,11 @@ $(XSA): $(VPP_LINK_DEPS)
 $(DIR_BUILD)/hw/hls/%.xo: $(DIR_HLS)/src/%.cpp $(DIR_HLS)/src/transpose.cpp
 	$(dir_guard)
 	v++ -c --target hw --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -I$(DIR_HLS)/src -o $@
+
+# hw emu
+$(DIR_BUILD)/hw_emu/hls/%.xo: $(DIR_HLS)/src/%.cpp $(DIR_HLS)/src/transpose.cpp
+	$(dir_guard)
+	v++ -c --target hw_emu --platform $(PLATFORM) $(VPP_HLS_FLAGS) $(VPP_INTERMEDIATE_FILE_DIRS) -k $(firstword $(subst _, ,$*)) $^ -I$(DIR_HLS)/src -o $@
 
 # sw_emu
 $(DIR_BUILD)/sw_emu/hls/mm2sleft_%.xo: $(DIR_HLS)/src/mm2sleft_%.cpp $(DIR_HLS)/src/transpose.cpp

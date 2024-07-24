@@ -80,6 +80,8 @@ class acap_info {
     }
     std::string splitFilename(size_t index) {
       std::string filename = this->xclbinFile;
+      size_t pos_xclbin = filename.find(".xclbin");
+      filename.erase(pos_xclbin, 7);
       std::vector<std::string> parts;
       size_t pos = 0;
       std::string delimiter = "_";

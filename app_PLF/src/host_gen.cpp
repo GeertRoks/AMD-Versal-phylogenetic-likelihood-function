@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 
 
   if (acap.get_target() == "hw") {
-    std::string csvFile = std::string("data_hw_pl_generator_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + tb.plf_calls + "_alignments" + tb.alignment_sites + "_usedgraphs" + tb.parallel_instances + ".csv";
+    std::string csvFile = std::string("data_hw_pl_generator_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + std::to_string(tb.plf_calls) + "_alignments" + std::to_string(tb.alignment_sites) + "_usedgraphs" + std::to_string(tb.parallel_instances) + ".csv";
     write_to_csv(csvFile, execution_ms);
   }
 
