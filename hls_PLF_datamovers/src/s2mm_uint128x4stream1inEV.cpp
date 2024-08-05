@@ -13,6 +13,8 @@
 extern "C" {
 
   void s2mm(ap_uint<512>* mem, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
+#pragma HLS PIPELINE
+
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 
 #pragma HLS interface axis port=s0
@@ -31,6 +33,7 @@ extern "C" {
     // Receive alignment site data
     for(unsigned int i = 0; i < alignment_sites; i++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS loop_tripcount min=100 max=10000000 avg=100000
 
       ap_axiu<128,0,0,0> x[4];
       ap_uint<512> buffer = 0;
@@ -56,7 +59,6 @@ extern "C" {
       x[3] = s3.read();
     }
 
-  }
-}
+  } // void s2mm()
 
-
+} // extern "C"

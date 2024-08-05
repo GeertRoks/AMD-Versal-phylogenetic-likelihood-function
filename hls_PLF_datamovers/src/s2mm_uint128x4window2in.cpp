@@ -13,6 +13,8 @@
 extern "C" {
 
   void s2mm(ap_uint<512>* mem, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
+#pragma HLS PIPELINE
+
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 
 #pragma HLS interface axis port=s0
@@ -25,41 +27,66 @@ extern "C" {
 #pragma HLS INTERFACE s_axilite port=window_size bundle=control
 #pragma HLS interface s_axilite port=return bundle=control
 
-    ap_uint<512> buffer = 0;
-    hls::stream<ap_axiu<128,0,0,0>>* data_streams[] = {&s0, &s1, &s2, &s3};
-
     // (window_size/4 bytes per value)/4 values per alignment -> div by 16
     const unsigned int alignments_per_window = (window_size>>4);
-    const unsigned int num_windows = (alignment_sites+alignments_per_window-1)/alignments_per_window;
-
+    const unsigned int num_full_windows = alignment_sites/alignments_per_window;
     // calculate if alignment sites fits in the windows or if extention by zeroes is needed
-    unsigned int quotient = alignment_sites/alignments_per_window;
-    unsigned int product = quotient*alignments_per_window;
-    unsigned int remainder = alignment_sites - product;
-    unsigned int padding = 0;
-    if (remainder != 0) {
-      //invert the remainder
-      padding = alignments_per_window-remainder;
-    }
+    const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
+
 
     // Receive alignment site data
-    for(unsigned int i = 0; i < alignment_sites+padding; i++) {
+    for(unsigned int window = 0; window < num_full_windows; window++) {
 #pragma HLS PIPELINE II=1
-      if (i < alignment_sites) {
-        for(unsigned int j = 0; j < 4; j++) {
-          ap_axiu<128,0,0,0> x = data_streams[j]->read();
-          buffer.range(127+j*128, j*128) = x.data;
-        }
-        mem[i] = buffer;
-      } else {
-        for(unsigned int j = 0; j < 4; j++) {
-          ap_axiu<128,0,0,0> x = data_streams[j]->read();
-        }
+#pragma HLS loop_tripcount min=1 max=9765 avg=6000
+      for(unsigned int i = 0; i < alignments_per_window; i++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS loop_tripcount min=64 max=1018 avg=512
+
+        ap_axiu<128,0,0,0> x[4];
+        ap_uint<512> buffer = 0;
+
+        x[0] = s0.read();
+        x[1] = s1.read();
+        x[2] = s2.read();
+        x[3] = s3.read();
+        buffer.range(127, 0) = x[0].data;
+        buffer.range(255, 128) = x[1].data;
+        buffer.range(383, 256) = x[2].data;
+        buffer.range(511, 384) = x[3].data;
+
+        mem[(window*alignments_per_window)+i] = buffer;
       }
     }
+    if (remainder > 0) {
+      for(unsigned int i = 0; i < remainder; i++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS loop_tripcount min=1 max=1017 avg=509
 
-  }
+        ap_axiu<128,0,0,0> x[4];
+        ap_uint<512> buffer = 0;
 
-}
+        x[0] = s0.read();
+        x[1] = s1.read();
+        x[2] = s2.read();
+        x[3] = s3.read();
+        buffer.range(127, 0) = x[0].data;
+        buffer.range(255, 128) = x[1].data;
+        buffer.range(383, 256) = x[2].data;
+        buffer.range(511, 384) = x[3].data;
 
+        mem[(num_full_windows*alignments_per_window)+i] = buffer;
+      }
+      for(unsigned int i = remainder; i < alignments_per_window; i++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS loop_tripcount min=1 max=1017 avg=508
+        ap_axiu<128,0,0,0> x[4];
+        x[0] = s0.read();
+        x[1] = s1.read();
+        x[2] = s2.read();
+        x[3] = s3.read();
+      }
+    } // if(remainder)
 
+  } // void s2mm()
+
+} // extern "C"
