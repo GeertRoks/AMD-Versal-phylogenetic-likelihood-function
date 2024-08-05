@@ -8,7 +8,6 @@ SPDX-License-Identifier: X11
 #include <hls_stream.h>
 #include <ap_axi_sdata.h>
 #include <stdio.h>
-#include "transpose.h"
 
 
 extern "C" {
@@ -30,6 +29,7 @@ extern "C" {
   }
 
   void mm2sright(unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>> &s0, hls::stream<ap_axiu<128,0,0,0>> &s1, hls::stream<ap_axiu<128,0,0,0>> &s2, hls::stream<ap_axiu<128,0,0,0>> &s3, hls::stream<ap_axiu<128,0,0,0>> &sBranch0, hls::stream<ap_axiu<128,0,0,0>> &sBranch1, hls::stream<ap_axiu<128,0,0,0>> &sBranch2, hls::stream<ap_axiu<128,0,0,0>> &sBranch3) {
+#pragma HLS PIPELINE
 
 #pragma HLS interface axis port=s0
 #pragma HLS interface axis port=s1
@@ -52,109 +52,41 @@ extern "C" {
       0.034567, 0.045678, 0.056789, 0.067890
     };
 
-    // read branch matrices and transpose them
-    ap_uint<512> branch[4] = {0,0,0,0};
-    convertFloatArraytoUint(data_arr, branch[0]);
-    convertFloatArraytoUint(data_arr, branch[1]);
-    convertFloatArraytoUint(data_arr, branch[2]);
-    convertFloatArraytoUint(data_arr, branch[3]);
-
     // read alignment data
     ap_uint<512> buffer = 0;
     convertFloatArraytoUint(data_arr, buffer);
+
+    ap_axiu<128,0,0,0> x[4];
+    x[0].data = buffer.range(127, 0);
+    x[1].data = buffer.range(255, 128);
+    x[2].data = buffer.range(383, 256);
+    x[3].data = buffer.range(511, 384);
 
     // (window_size/4 bytes per value)/4 values per alignment -> div by 16
     const unsigned int alignments_per_window = (window_size>>4);
     const unsigned int num_full_windows = alignment_sites/alignments_per_window;
     const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
+    const unsigned int extra_window = (remainder > 0);
 
-    for(unsigned int window = 0; window < num_full_windows; window++) {
-#pragma HLS PIPELINE II=1
+    for(unsigned int window = 0; window < num_full_windows+extra_window; window++) {
+#pragma HLS PIPELINE
+#pragma HLS loop_tripcount min=0 max=9765 avg=6000
 
-      // Split the branch matrix and send them to each branch stream individually
-      // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
       for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[0].range(127 + j*128, j*128);
-        sBranch0.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[1].range(127 + j*128, j*128);
-        sBranch1.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[2].range(127 + j*128, j*128);
-        sBranch2.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[3].range(127 + j*128, j*128);
-        sBranch3.write(x);
+#pragma HLS UNROLL FULL
+        sBranch0.write(x[0]);
+        sBranch1.write(x[1]);
+        sBranch2.write(x[2]);
+        sBranch3.write(x[3]);
       }
 
-      // Send alignment site data for a window
       for(unsigned int i = 0; i < alignments_per_window; i++) {
 #pragma HLS PIPELINE II=1
-        // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
-        ap_axiu<128,0,0,0> x[4];
-        x[0].data = buffer.range(127, 0);
-        x[1].data = buffer.range(255, 128);
-        x[2].data = buffer.range(383, 256);
-        x[3].data = buffer.range(511, 384);
+#pragma HLS loop_tripcount min=64 max=1018 avg=512
         s0.write(x[0]);
         s1.write(x[1]);
         s2.write(x[2]);
         s3.write(x[3]);
-      }
-    }
-    if (remainder > 0) {
-      // Split the branch matrix and send them to each branch stream individually
-      // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[0].range(127 + j*128, j*128);
-        sBranch0.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[1].range(127 + j*128, j*128);
-        sBranch1.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[2].range(127 + j*128, j*128);
-        sBranch2.write(x);
-      }
-      for(unsigned int j = 0; j < 4; j++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = branch[3].range(127 + j*128, j*128);
-        sBranch3.write(x);
-      }
-
-      // Send alignment site data for a window
-      for(unsigned int i = 0; i < remainder; i++) {
-#pragma HLS PIPELINE II=1
-        // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
-        ap_axiu<128,0,0,0> x[4];
-        x[0].data = buffer.range(127, 0);
-        x[1].data = buffer.range(255, 128);
-        x[2].data = buffer.range(383, 256);
-        x[3].data = buffer.range(511, 384);
-        s0.write(x[0]);
-        s1.write(x[1]);
-        s2.write(x[2]);
-        s3.write(x[3]);
-      }
-      // add zeroes to the input stream if alignments does not fit exactly in the last aie window
-      for(unsigned int i = remainder; i < alignments_per_window; i++) {
-        ap_axiu<128,0,0,0> x;
-        x.data = 0;
-        s0.write(x);
-        s1.write(x);
-        s2.write(x);
-        s3.write(x);
       }
     }
 

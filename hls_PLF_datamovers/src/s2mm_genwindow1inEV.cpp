@@ -13,6 +13,7 @@
 extern "C" {
 
   void s2mm(unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
+#pragma HLS PIPELINE
 
 #pragma HLS interface axis port=s0
 #pragma HLS interface axis port=s1
@@ -27,16 +28,17 @@ extern "C" {
     const unsigned int alignments_per_window = (window_size>>4);
     const unsigned int num_full_windows = alignment_sites/alignments_per_window;
     const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
-    unsigned int extra_window = 0;
+    const unsigned int extra_window = (remainder > 0);
 
-    if (remainder > 0) {
-      extra_window = 1;
-    }
 
     // Receive alignment site data
     for(unsigned int window = 0; window < num_full_windows+extra_window; window++) {
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE
+#pragma HLS loop_tripcount min=1 max=9765 avg=6000
+
       for(unsigned int i = 0; i < alignments_per_window; i++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS loop_tripcount min=64 max=1018 avg=512
 
         ap_axiu<128,0,0,0> x[4];
 
