@@ -181,7 +181,7 @@ run_hw_pcie:
 run_hw_gen:
 	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
 
-ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
+ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000
 
 run_hw_gen_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
@@ -189,13 +189,11 @@ run_hw_gen_tests:
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN)
+	$(DIR_BUILD)/hw/host.exe $(XCLBIN) 100
 
 run_hw_tests:
-	for buf in $(BUFFER_SIZES); do\
-		for chunk in $(CHUNK_SIZES); do\
-			$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$buf $$chunk; \
-		done; \
+	for alignments in $(ALIGNMENT_SITES); do\
+		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments; \
 	done
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
@@ -235,7 +233,7 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
 	cd -
 
 

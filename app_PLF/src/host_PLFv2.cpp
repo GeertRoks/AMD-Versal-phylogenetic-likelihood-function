@@ -9,12 +9,18 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 2)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin>\n");
+  if(argc != 3)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
-  tb.alignment_sites=250000;
+  try {
+    tb.alignment_sites = std::stoul(argv[2]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for alignment_sites: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(alignment sites) out of range" << std::endl;
+  }
   tb.plf_calls = 50;
   tb.window_size = 1024;
   tb.combined_ev = 0;
@@ -114,19 +120,24 @@ int main(int argc, char* argv[]) {
   xrt::run* mm2sleft_run = new xrt::run[tb.parallel_instances];
   xrt::run* mm2sright_run = new xrt::run[tb.parallel_instances];
   xrt::run* s2mm_run = new xrt::run[tb.parallel_instances];
+  std::cout << "alignments per instance: " << tb.alignments_per_instance() << ", padding: " << tb.alignments_padding() << std::endl;
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
+    std::cout << "last instance[" << i << "]: " << ((i == (tb.parallel_instances-1)) && (i != 0)) << ", alignments: " << (tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding())) << std::endl;
     mm2sleft_run[i] = xrt::run(mm2sleft_kernels[i]);
     mm2sleft_run[i].set_arg(0, in_left_plf[i]);
+    //mm2sleft_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
     mm2sleft_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sleft_run[i].set_arg(2, tb.window_size);
 
     mm2sright_run[i] = xrt::run(mm2sright_kernels[i]);
     mm2sright_run[i].set_arg(0, in_right_plf[i]);
+    //mm2sright_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
     mm2sright_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sright_run[i].set_arg(2, tb.window_size);
 
     s2mm_run[i] = xrt::run(s2mm_kernels[i]);
     s2mm_run[i].set_arg(0, out_plf[i]);
+    //s2mm_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
     s2mm_run[i].set_arg(1, tb.alignments_per_instance());
     s2mm_run[i].set_arg(2, tb.window_size);
   }
@@ -207,6 +218,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
+
   //Run///////////////////////////////////////////////////////////////////////////////////////////////////
   auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
   Timer t;
@@ -252,6 +264,7 @@ int main(int argc, char* argv[]) {
   //Check///////////////////////////////////////////////////////////////////////////////////////////////////
   std::cout << "Data collected, checking for correctness ..." << std::endl;
 
+
   timing_data reference_ms(tb.plf_calls);
   t.reset();
 
@@ -286,10 +299,10 @@ int main(int argc, char* argv[]) {
   print_timing_data(execution_ms, reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
 
 
-  //if (acap.get_target() == "hw") {
-  //  std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_freq" + STRINGIFY(PL_FREQ) + "_plfs" + STRINGIFY(tb.plf_calls) + ".csv";
-  //  //write_to_csv(csvFile, execution_ms);
-  //}
+  if (acap.get_target() == "hw") {
+    std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + std::to_string(tb.plf_calls) + "_alignments" + std::to_string(tb.alignment_sites) + "_usedgraphs" + std::to_string(tb.parallel_instances) + ".csv";
+    write_to_csv(csvFile, execution_ms);
+  }
 
   //Cleanup////////////////////////////////////////////////////////////////////////////////////////////////
 

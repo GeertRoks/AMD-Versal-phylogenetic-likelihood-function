@@ -139,10 +139,10 @@ struct testbench_info {
   unsigned int instance_size_out() { return this->word_size * this->instance_elements_out(); }
 
   unsigned int alignments_per_instance() {
-    return std::ceil(alignment_sites/parallel_instances);
+    return std::ceil((double)alignment_sites/(double)parallel_instances);
   }
   unsigned int alignments_padding() {
-    return (this->alignments_per_instance()*this->parallel_instances) - this->alignment_sites;
+    return (unsigned int)(this->alignments_per_instance()*this->parallel_instances) - this->alignment_sites;
   }
   unsigned int alignments_padding_elements() {
     return this->alignments_padding() * this->elements_per_alignment;
