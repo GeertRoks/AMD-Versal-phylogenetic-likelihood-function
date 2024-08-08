@@ -1,13 +1,20 @@
 #include "plf.h"
 #include <iostream>
 
+#define ABS(x)    (((x)<0)   ?  (-(x)) : (x))
+#define twotothe32  4294967296.0
+#define minlikelihood  (1.0/twotothe32)
+
 void plf(
     float *x1_start, float *x2_start, float *x3_start,
     float *EV, const int n, float *left, float *right
     )
 {
+  unsigned int useFastScaling = 1;
   int i, j, k, l = 0;
   float *x1, *x2, *x3, ump_x1, ump_x2, x1px2[4];
+  int addScale, scale = 0;
+  int wgt = 1;
 
   for (i = 0; i < n; i++)
   {
@@ -43,7 +50,20 @@ void plf(
       }
 
     }
+    scale = 1;
+    for(l = 0; scale && (l < 16); l++) {
+      scale = (ABS(x3[l]) <  minlikelihood);
+    }
 
+    if(scale) {
+      for (l=0; l<16; l++) {
+        x3[l] *= twotothe32;
+      }
+
+      if(useFastScaling) {
+        addScale += wgt;
+      }
+    }
   }
 
 }

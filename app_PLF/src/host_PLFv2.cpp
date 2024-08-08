@@ -170,6 +170,8 @@ int main(int argc, char* argv[]) {
   float** alignmentsleft = new float*[tb.plf_calls];
   float** alignmentsright = new float*[tb.plf_calls];
 
+  float* wgt = new float[tb.alignment_sites];
+
   float** dataLeftInput = new float*[tb.plf_calls];
   float** dataRightInput = new float*[tb.plf_calls];
   float** dataOutput = new float*[tb.plf_calls];
@@ -199,7 +201,7 @@ int main(int argc, char* argv[]) {
     }
     // load alignment data
     for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-      alignmentsleft[i][j] = dis(gen);
+      alignmentsleft[i][j] = dis(gen) * 1.0e-12;
       alignmentsright[i][j] = dis(gen);
     }
 
@@ -216,6 +218,32 @@ int main(int argc, char* argv[]) {
         std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 64 + j * tb.instance_elements_right() );
       }
     }
+  }
+
+  // load wgt to s2mm
+  for (unsigned long int i = 0; i < tb.alignment_sites; i++) {
+    wgt[i] = (i%3);
+  }
+  std::copy(wgt, wgt + tb.alignment_sites, dataOutput[0]);
+
+  out_buffer.write(dataOutput[0]);
+  out_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+
+  for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+    s2mm_run[j].set_arg(0, out_buffer);
+    s2mm_run[j].set_arg(3, 1);
+  }
+  for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+    s2mm_run[k].start();
+  }
+  for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+    s2mm_run[k].wait();
+  }
+
+  // reset s2mm param for execution
+  for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+    s2mm_run[j].set_arg(0, out_plf[j]);
+    s2mm_run[j].set_arg(3, 0);
   }
 
 

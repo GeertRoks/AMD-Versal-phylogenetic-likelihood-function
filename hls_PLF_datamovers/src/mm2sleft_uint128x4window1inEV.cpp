@@ -45,8 +45,9 @@ extern "C" {
     const unsigned int alignments_per_window = (window_size>>4);
     const unsigned int num_full_windows = alignment_sites/alignments_per_window;
     const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
+    const unsigned int extra_window = (remainder > 0);
 
-    for(unsigned int window = 0; window < num_full_windows; window++) {
+    for(unsigned int window = 0; window < num_full_windows + extra_window; window++) {
 #pragma HLS PIPELINE
 #pragma HLS loop_tripcount min=1 max=9765 avg=6000
 
@@ -95,62 +96,6 @@ extern "C" {
         s3.write(x[3]);
       }
     }
-    if (remainder > 0 ) {
-      // load top half of EV matrix
-      s0.write(ev_packet[0]);
-      s1.write(ev_packet[0]);
-      s2.write(ev_packet[0]);
-      s3.write(ev_packet[0]);
-      s0.write(ev_packet[1]);
-      s1.write(ev_packet[1]);
-      s2.write(ev_packet[1]);
-      s3.write(ev_packet[1]);
-
-      // Split the branch matrix and prepend them to the corresponding data stream
-      // (64 elem * 32 = 2048 bits / 512 bits = 4 mem reads with 4 128-bit stream writes each (16 total))
-      for(unsigned int j = 0; j < 4; j++) {
-#pragma HLS PIPELINE II=1
-        ap_axiu<128,0,0,0> x[4];
-        x[0].data = branch[0].range(127 + j*128, j*128);
-        x[1].data = branch[1].range(127 + j*128, j*128);
-        x[2].data = branch[2].range(127 + j*128, j*128);
-        x[3].data = branch[3].range(127 + j*128, j*128);
-        s0.write(x[0]);
-        s1.write(x[1]);
-        s2.write(x[2]);
-        s3.write(x[3]);
-      }
-
-      // read the remaining alignments for the last window
-      for(unsigned int i = 0; i < remainder; i++) {
-#pragma HLS PIPELINE II=1
-#pragma HLS loop_tripcount min=1 max=1017 avg=509
-        // read all 16 values of one alignement
-        // ((512 bits read/8 bits per byte)/4 bytes per float = 16 values)
-        ap_uint<512> buffer = mem[5+(alignments_per_window*num_full_windows)+i];
-        // give each data stream 4 data values of the 16 over a 128-bit stream ((128/8)/4 = 4 values)
-        ap_axiu<128,0,0,0> x[4];
-        x[0].data = buffer.range(127, 0);
-        x[1].data = buffer.range(255, 128);
-        x[2].data = buffer.range(383, 256);
-        x[3].data = buffer.range(511, 384);
-        s0.write(x[0]);
-        s1.write(x[1]);
-        s2.write(x[2]);
-        s3.write(x[3]);
-      }
-      // add zeroes to the input stream if alignments does not fit exactly in the last aie window
-      for(unsigned int i = remainder; i < alignments_per_window; i++) {
-#pragma HLS PIPELINE II=1
-#pragma HLS loop_tripcount min=1 max=1017 avg=508
-        ap_axiu<128,0,0,0> x;
-        x.data = 0;
-        s0.write(x);
-        s1.write(x);
-        s2.write(x);
-        s3.write(x);
-      }
-    } // if(remainder)
 
   } //void mm2sleft
 

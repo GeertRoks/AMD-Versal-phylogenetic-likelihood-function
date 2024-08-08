@@ -115,6 +115,7 @@ struct testbench_info {
   unsigned int elements_per_alignment = 16;
   unsigned int plf_calls;
   unsigned int window_size;
+  unsigned int alignments_per_window() { return (this->window_size>>4); };
   unsigned int combined_ev = 0;
 
   unsigned long long int data_size() { return (unsigned long long int) this->data_elements() * this->word_size; }
@@ -172,6 +173,12 @@ struct testbench_info {
     return this->alignment_sites * this->elements_per_alignment;
   }
   unsigned int elements_per_instance() {
-    return this->alignments_per_instance() * this->elements_per_alignment;
+    return this->num_windows_per_instance() * this->alignments_per_window() * this->elements_per_alignment;
   }
+  unsigned int num_windows_per_instance() {
+    unsigned int num_full_windows = this->alignments_per_instance()/this->alignments_per_window();
+    unsigned int remainder = this->alignments_per_instance() - (num_full_windows*this->alignments_per_window());
+    return num_full_windows + (remainder > 0);
+  }
+
 };
