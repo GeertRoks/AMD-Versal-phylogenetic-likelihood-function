@@ -181,7 +181,7 @@ run_hw_pcie:
 run_hw_gen:
 	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
 
-ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000
+ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
 
 run_hw_gen_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
@@ -233,7 +233,7 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 256; \
 	cd -
 
 
