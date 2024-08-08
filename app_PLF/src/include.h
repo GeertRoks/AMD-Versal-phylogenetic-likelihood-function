@@ -109,14 +109,18 @@ class acap_info {
     }
 };
 
+typedef enum {ONE_INEV, TWO_IN} layout_t;
+typedef enum {STREAM, WINDOW} aie_t;
+
 struct testbench_info {
   unsigned int parallel_instances = 1;
   unsigned int alignment_sites;
   unsigned int elements_per_alignment = 16;
   unsigned int plf_calls;
-  unsigned int window_size;
+  unsigned int window_size = 1024;
   unsigned int alignments_per_window() { return (this->window_size>>4); };
-  unsigned int combined_ev = 0;
+  layout_t input_layout;
+  aie_t aie_type;
 
   unsigned long long int data_size() { return (unsigned long long int) this->data_elements() * this->word_size; }
   unsigned long long int data_elements() { return (unsigned long long int) this->elements_per_instance() * this->parallel_instances * this->plf_calls; }
@@ -163,7 +167,16 @@ struct testbench_info {
     return this->elements_per_instance() + 5*16;
   }
   unsigned int instance_elements_right() {
-    return combined_ev ? this->elements_per_instance() + 5*16 : this->elements_per_instance() + 4*16;
+    unsigned int result = this->elements_per_instance();
+    switch (input_layout) {
+      case TWO_IN:
+        result += 4*16;
+        break;
+      case ONE_INEV:
+        result += 5*16;
+        break;
+    }
+    return result;
   }
   unsigned int instance_elements_out() {
     return this->elements_per_instance();
@@ -173,7 +186,19 @@ struct testbench_info {
     return this->alignment_sites * this->elements_per_alignment;
   }
   unsigned int elements_per_instance() {
-    return this->num_windows_per_instance() * this->alignments_per_window() * this->elements_per_alignment;
+    unsigned int result = 0;
+    switch (aie_type) {
+      case STREAM:
+        result = this->alignments_per_instance() + this->stream_padding();
+        break;
+      case WINDOW:
+        result = this->num_windows_per_instance() * this->alignments_per_window();
+        break;
+    }
+    return result * this->elements_per_alignment;
+  }
+  unsigned int stream_padding() {
+    return this->alignment_sites & 1;
   }
   unsigned int num_windows_per_instance() {
     unsigned int num_full_windows = this->alignments_per_instance()/this->alignments_per_window();

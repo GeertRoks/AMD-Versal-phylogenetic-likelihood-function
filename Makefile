@@ -16,15 +16,14 @@
 #PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 PLATFORM := /home/s2716879/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 WORKSPACE := PLF
-VERSION := PLFv1
+VERSION := window
 
 PL ?= uint128x4
 AIE ?= 128x1PLF
 
 PL_TYPE := $(patsubst uint128x4%,%,$(PL))
 
-#PL_FREQ := 300
-AIE_FREQ := 300
+PL_FREQ := 400
 
 # Targets: sw_emu, hw_emu, hw
 TARGET := sw_emu
@@ -39,10 +38,10 @@ endif
 DIR_HOST := app_$(WORKSPACE)
 DIR_AIE := aie_$(WORKSPACE)
 DIR_HLS := hls_$(WORKSPACE)_datamovers
-DIR_BUILD := build/$(VERSION)
+DIR_BUILD := build
 
-AIE_SRCS_MAIN := $(DIR_AIE)/src/$(VERSION)/$(AIE)/project.cpp
-AIE_SRCS_OTHER := $(filter-out $(AIE_SRCS_MAIN), $(wildcard $(DIR_AIE)/src/$(VERSION)/$(AIE)/*))
+AIE_SRCS_MAIN := $(DIR_AIE)/src/$(AIE)/project.cpp
+AIE_SRCS_OTHER := $(filter-out $(AIE_SRCS_MAIN), $(wildcard $(DIR_AIE)/src/$(AIE)/*))
 
 # artefacts
 AIE_LIBADF := $(DIR_BUILD)/$(AIE_TARGET)/aie/libadf_$(AIE).a
@@ -167,7 +166,7 @@ hls: $(HLS_XO)
 #####################################################################################################
 CURRENT_DATE_TIME := $(shell date +%Y%m%d-%H%M%S)
 PROJECT_ROOT := $(shell pwd)
-DIR_EMU_LOGS := emulation/$(VERSION)
+DIR_EMU_LOGS := emulation
 
 BUFFER_SIZE ?= 8388608
 CHUNK_SIZE ?= 1048576
@@ -280,7 +279,7 @@ $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 	# Preferering to use 'v++ -c --mode aie' instead of aiecompiler, because it seems that aiecompiler is getting phased out. Also, aiecompiler has no option to place log files in a specific directory, which will clutter the workspace
 	# Using the --aie_legacy flag to enable the use of aiecompiler flags using v++. Needed because the -o flag of v++ has no effect on libadf.a, so --ouput-archive of aiecompiler is used.
 	# If this is fixed in a later version of v++, then remove the --aie_legacy flag and replace the --ouput-archive flag with -o
-	v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(VERSION)/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(VERSION)/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
+	v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
 	#aiecompiler --target $* --platform $(PLATFORM) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/kernels" -I "$(DIR_AIE)" --workdir=$(@D)/Work $< --output-archive $@
 
 #####################################################################################################

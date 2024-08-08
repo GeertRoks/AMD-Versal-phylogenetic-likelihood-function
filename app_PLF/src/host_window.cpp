@@ -21,10 +21,12 @@ int main(int argc, char* argv[]) {
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(alignment sites) out of range" << std::endl;
   }
-  tb.plf_calls = 50;
-  tb.window_size = 1024;
-  tb.combined_ev = 0;
+  tb.plf_calls = 1;
+  tb.window_size = 16384;
+  tb.input_layout = TWO_IN;
   tb.parallel_instances = 1;
+
+  tb.aie_type = WINDOW;
 
   std::cout << std::left << std::endl;
   std::cout << "====================================================================================" << std::endl;
@@ -209,7 +211,7 @@ int main(int argc, char* argv[]) {
       std::copy(ev[i],                                               ev[i]+16,                                              dataLeftInput[i] + j*tb.instance_elements_left()          );
       std::copy(branchleft[i],                                       branchleft[i]+64,                                      dataLeftInput[i] + 16 + j*tb.instance_elements_left()     );
       std::copy(alignmentsleft[i] + j*tb.elements_per_instance(),    alignmentsleft[i] + (j+1)*tb.elements_per_instance(),  dataLeftInput[i] + 80 + j * tb.instance_elements_left()   );
-      if (tb.combined_ev) {
+      if (tb.input_layout == ONE_INEV) {
         std::copy(ev[i],                                             ev[i]+16,                                              dataRightInput[i] + j*tb.instance_elements_right()        );
         std::copy(branchright[i],                                    branchright[i]+64,                                     dataRightInput[i] + 16 + j*tb.instance_elements_right()   );
         std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 80 + j * tb.instance_elements_right() );

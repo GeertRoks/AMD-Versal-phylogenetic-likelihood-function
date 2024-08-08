@@ -42,7 +42,7 @@ extern "C" {
     const unsigned int extra_window = (remainder > 0);
 
     static int wgt[WGT_SIZE];
-//#pragma HLS BIND_STORAGE variable=wgt type=ram_1p impl=bram
+#pragma HLS BIND_STORAGE variable=wgt type=ram_2p impl=bram
 
     int addScale = 0;
     bool useFastScaling = 1;
@@ -51,9 +51,10 @@ extern "C" {
     if (fill_wgt) {
       for (unsigned int j = 0; j < (WGT_SIZE>>4); j++) {
 #pragma HLS PIPELINE II=1
+        ap_uint<512> temp = mem[j];
         for (unsigned int i = 0; i < 16; i++) {
-#pragma HLS UNROLL factor=16
-          wgt[(j*16)+i] = mem[j].range(15+(i*16), i*16);
+#pragma HLS UNROLL factor=2 skip_exit_check
+          wgt[(j*16)+i] = temp.range(15+(i*16), i*16);
         }
       }
     } else {
