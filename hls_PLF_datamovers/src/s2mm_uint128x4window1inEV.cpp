@@ -14,7 +14,7 @@
 
 #define minlikelihood  (1.0/twotothe32)
 
-#define WGT_SIZE 16384
+#define WGT_SIZE 1024
 
 extern "C" {
 
@@ -45,7 +45,6 @@ extern "C" {
 #pragma HLS BIND_STORAGE variable=wgt type=ram_2p impl=bram
 
     int addScale = 0;
-    bool useFastScaling = 1;
     int scalerIncrement = 0;
 
     if (fill_wgt) {
@@ -54,7 +53,7 @@ extern "C" {
         ap_uint<512> temp = mem[j];
         for (unsigned int i = 0; i < 16; i++) {
 #pragma HLS UNROLL factor=2 skip_exit_check
-          wgt[(j*16)+i] = temp.range(15+(i*16), i*16);
+          wgt[(j*16)+i] = temp.range(31+(i*32), i*32);
         }
       }
     } else {
@@ -62,7 +61,7 @@ extern "C" {
       for(unsigned int window = 0; window < num_full_windows + extra_window; window++) {
 #pragma HLS PIPELINE
 #pragma HLS loop_tripcount min=1 max=9765 avg=6000
-        for(unsigned int i = 0; i < alignments_per_window; i++) {
+        for(unsigned int alignment = 0; alignment < alignments_per_window; alignment++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS loop_tripcount min=64 max=1018 avg=512
 
@@ -92,12 +91,12 @@ extern "C" {
           }
 
           // perform scaling when needed
-          if (scale==0) {
+          if ( (scale==0) && (((window*alignments_per_window)+alignment)<alignment_sites) ) {
             for (unsigned int l=0; l<16; l++) {
 #pragma HLS UNROLL factor=16
               x3[l] *= twotothe32;
             }
-            addScale += wgt[(window*alignments_per_window)+i];
+            addScale += wgt[(window*alignments_per_window)+alignment];
           }
 
           //pack x3 -> buffer
@@ -109,7 +108,7 @@ extern "C" {
           }
 
           // write buffer to memory
-          mem[(window*alignments_per_window)+i] = buffer;
+          mem[(window*alignments_per_window)+alignment] = buffer;
         }
       }
     }

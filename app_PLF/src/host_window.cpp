@@ -22,8 +22,8 @@ int main(int argc, char* argv[]) {
     std::cerr << "Argument(alignment sites) out of range" << std::endl;
   }
   tb.plf_calls = 1;
-  tb.window_size = 16384;
-  tb.input_layout = TWO_IN;
+  tb.window_size = 1024;
+  tb.input_layout = ONE_INEV;
   tb.parallel_instances = 1;
 
   tb.aie_type = WINDOW;
