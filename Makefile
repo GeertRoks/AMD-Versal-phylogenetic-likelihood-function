@@ -16,7 +16,6 @@
 #PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 PLATFORM := /home/s2716879/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 WORKSPACE := PLF
-VERSION := window
 
 PL ?= uint128x4
 AIE ?= 128x1PLF
@@ -181,6 +180,8 @@ run_hw_gen:
 	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
 
 ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
+PLF_CALLS ?= 1
+INSTANCES_USED ?= 1
 
 run_hw_gen_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
@@ -188,11 +189,11 @@ run_hw_gen_tests:
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN) 100
+	$(DIR_BUILD)/hw/host.exe $(XCLBIN) 100 $(PLF_CALLS) $(INSTANCES_USED)
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments; \
+		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED); \
 	done
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
@@ -232,7 +233,7 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 256; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 203 $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
 
 
@@ -250,7 +251,7 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 #	$(dir_guard)
 #	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
 
-$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host_$(VERSION).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 

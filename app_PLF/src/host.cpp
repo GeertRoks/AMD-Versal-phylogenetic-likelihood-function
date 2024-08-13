@@ -9,8 +9,8 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 3)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments>\n");
+  if(argc != 5)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
@@ -21,12 +21,24 @@ int main(int argc, char* argv[]) {
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(alignment sites) out of range" << std::endl;
   }
-  tb.plf_calls = 1;
+  try {
+    tb.plf_calls = std::stoul(argv[3]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for plf_calls: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(plf calls) out of range" << std::endl;
+  }
+  try {
+    tb.parallel_instances = std::stoul(argv[4]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for parallel_instances: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(instances used) out of range" << std::endl;
+  }
   tb.window_size = 1024;
-  tb.input_layout = ONE_INEV;
-  tb.parallel_instances = 4;
+  tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
-  tb.aie_type = WINDOW;
+  tb.aie_type = acap.classifyAieType(acap.get_pl_name());
 
   std::cout << std::left << std::endl;
   std::cout << "====================================================================================" << std::endl;

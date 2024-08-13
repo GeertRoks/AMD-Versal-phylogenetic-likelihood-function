@@ -17,6 +17,10 @@
 
 #include "plf.h"
 
+typedef enum {ONE_INEV, TWO_IN} layout_t;
+typedef enum {STREAM, WINDOW} aie_t;
+
+
 std::string kernel_name(std::string kernel, unsigned int it);
 bool prerun_check();
 unsigned int findNumAieIOInXclbin(const std::string& input);
@@ -37,6 +41,22 @@ class acap_info {
     std::string get_app_name() { return splitFilename(0); }
     std::string get_pl_name() { return splitFilename(1); }
     std::string get_aie_name() { return splitFilename(2); }
+    aie_t classifyAieType(const std::string& str) {
+      if (str.find("stream") != std::string::npos) {
+        return aie_t::STREAM;
+      } else if (str.find("window") != std::string::npos) {
+        return aie_t::WINDOW;
+      }
+      return aie_t::WINDOW; // Default case
+    }
+    layout_t classifyLayoutType(const std::string& str) {
+      if (str.find("1inEV") != std::string::npos) {
+        return layout_t::ONE_INEV;
+      } else if (str.find("2in") != std::string::npos) {
+        return layout_t::TWO_IN;
+      }
+      return layout_t::TWO_IN; // Default case
+    }
 
   private:
     std::string xclbinFile;
@@ -109,8 +129,6 @@ class acap_info {
     }
 };
 
-typedef enum {ONE_INEV, TWO_IN} layout_t;
-typedef enum {STREAM, WINDOW} aie_t;
 
 struct testbench_info {
   unsigned int parallel_instances = 1;
