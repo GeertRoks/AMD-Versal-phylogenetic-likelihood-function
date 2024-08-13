@@ -7,14 +7,14 @@
 
 void plf(
     float *x1_start, float *x2_start, float *x3_start,
-    float *EV, const int n, float *left, float *right
+    float *EV, const int n, float *left, float *right,
+    int* wgt, int& scalerIncrement
     )
 {
-  unsigned int useFastScaling = 1;
   int i, j, k, l = 0;
   float *x1, *x2, *x3, ump_x1, ump_x2, x1px2[4];
-  int addScale, scale = 0;
-  int wgt = 1;
+  int addScale = 0;
+  int scale = 0;
 
   for (i = 0; i < n; i++)
   {
@@ -60,10 +60,9 @@ void plf(
         x3[l] *= twotothe32;
       }
 
-      if(useFastScaling) {
-        addScale += wgt;
-      }
+      addScale += wgt[i];
     }
   }
+  scalerIncrement = addScale;
 
 }

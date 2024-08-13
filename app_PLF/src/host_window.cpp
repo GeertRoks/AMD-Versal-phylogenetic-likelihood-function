@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
   tb.plf_calls = 1;
   tb.window_size = 1024;
   tb.input_layout = ONE_INEV;
-  tb.parallel_instances = 1;
+  tb.parallel_instances = 4;
 
   tb.aie_type = WINDOW;
 
@@ -101,6 +101,7 @@ int main(int argc, char* argv[]) {
     printf("mm2sleft[%i] mem group: %i, ", i, mm2sleft_kernels[i].group_id(0));
     printf("mm2sright[%i] mem group: %i, ", i, mm2sright_kernels[i].group_id(0));
     printf("s2mm[%i] mem group: %i\n", i, s2mm_kernels[i].group_id(0));
+    printf("s2mm[%i] mem group: %i\n", i, s2mm_kernels[i].group_id(1));
   }
   printf("\nconnected to datamover kernels\n");
 
@@ -108,14 +109,17 @@ int main(int argc, char* argv[]) {
   xrt::bo in_left_buffer = xrt::bo(*acap.get_device(), tb.buffer_size_left(), xrt::bo::flags::normal, mm2sleft_kernels[0].group_id(0));
   xrt::bo in_right_buffer = xrt::bo(*acap.get_device(), tb.buffer_size_right(), xrt::bo::flags::normal, mm2sright_kernels[0].group_id(0));
   xrt::bo out_buffer = xrt::bo(*acap.get_device(), tb.buffer_size_out(), xrt::bo::flags::normal, s2mm_kernels[0].group_id(0));
+  xrt::bo bo_scalerIncrement = xrt::bo(*acap.get_device(), tb.parallel_instances * sizeof(int), xrt::bo::flags::normal, s2mm_kernels[0].group_id(1));
 
   xrt::bo* in_left_plf = new xrt::bo[tb.parallel_instances];
   xrt::bo* in_right_plf = new xrt::bo[tb.parallel_instances];
   xrt::bo* out_plf = new xrt::bo[tb.parallel_instances];
+  xrt::bo* bo_scaler = new xrt::bo[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     in_left_plf[i] = xrt::bo(in_left_buffer, tb.instance_size_left(), i*tb.instance_size_left());
     in_right_plf[i] = xrt::bo(in_right_buffer, tb.instance_size_right(), i*tb.instance_size_right());
     out_plf[i] = xrt::bo(out_buffer, tb.instance_size_out(), i*tb.instance_size_out());
+    bo_scaler[i] = xrt::bo(bo_scalerIncrement, sizeof(int), i*sizeof(int));
   }
 
   // Create the HLS kernel run handles and set the parameters
@@ -127,21 +131,22 @@ int main(int argc, char* argv[]) {
     std::cout << "last instance[" << i << "]: " << ((i == (tb.parallel_instances-1)) && (i != 0)) << ", alignments: " << (tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding())) << std::endl;
     mm2sleft_run[i] = xrt::run(mm2sleft_kernels[i]);
     mm2sleft_run[i].set_arg(0, in_left_plf[i]);
-    //mm2sleft_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
-    mm2sleft_run[i].set_arg(1, tb.alignments_per_instance());
+    mm2sleft_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
+    //mm2sleft_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sleft_run[i].set_arg(2, tb.window_size);
 
     mm2sright_run[i] = xrt::run(mm2sright_kernels[i]);
     mm2sright_run[i].set_arg(0, in_right_plf[i]);
-    //mm2sright_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
-    mm2sright_run[i].set_arg(1, tb.alignments_per_instance());
+    mm2sright_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
+    //mm2sright_run[i].set_arg(1, tb.alignments_per_instance());
     mm2sright_run[i].set_arg(2, tb.window_size);
 
     s2mm_run[i] = xrt::run(s2mm_kernels[i]);
     s2mm_run[i].set_arg(0, out_plf[i]);
-    //s2mm_run[i].set_arg(1, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
-    s2mm_run[i].set_arg(1, tb.alignments_per_instance());
-    s2mm_run[i].set_arg(2, tb.window_size);
+    s2mm_run[i].set_arg(1, bo_scaler[i]);
+    s2mm_run[i].set_arg(2, tb.alignments_per_instance() - ((i == tb.parallel_instances-1) * tb.alignments_padding()));
+    //s2mm_run[i].set_arg(2, tb.alignments_per_instance());
+    s2mm_run[i].set_arg(3, tb.window_size);
   }
 
   // In sw_emu the aie graph needs to be started manually
@@ -172,7 +177,8 @@ int main(int argc, char* argv[]) {
   float** alignmentsleft = new float*[tb.plf_calls];
   float** alignmentsright = new float*[tb.plf_calls];
 
-  float* wgt = new float[tb.alignment_sites];
+  int wgt[tb.alignment_sites] = {0};
+  unsigned int scalerIncrement_versal[tb.plf_calls][tb.parallel_instances] = {0};
 
   float** dataLeftInput = new float*[tb.plf_calls];
   float** dataRightInput = new float*[tb.plf_calls];
@@ -210,43 +216,43 @@ int main(int argc, char* argv[]) {
     for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
       std::copy(ev[i],                                               ev[i]+16,                                              dataLeftInput[i] + j*tb.instance_elements_left()          );
       std::copy(branchleft[i],                                       branchleft[i]+64,                                      dataLeftInput[i] + 16 + j*tb.instance_elements_left()     );
-      std::copy(alignmentsleft[i] + j*tb.elements_per_instance(),    alignmentsleft[i] + (j+1)*tb.elements_per_instance(),  dataLeftInput[i] + 80 + j * tb.instance_elements_left()   );
+      std::copy(alignmentsleft[i] + j*tb.alignments_per_instance(j)*tb.elements_per_alignment,    alignmentsleft[i] + (j+1)*tb.alignments_per_instance(j)*tb.elements_per_alignment,  dataLeftInput[i] + 80 + j * tb.instance_elements_left()   );
       if (tb.input_layout == ONE_INEV) {
         std::copy(ev[i],                                             ev[i]+16,                                              dataRightInput[i] + j*tb.instance_elements_right()        );
         std::copy(branchright[i],                                    branchright[i]+64,                                     dataRightInput[i] + 16 + j*tb.instance_elements_right()   );
-        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 80 + j * tb.instance_elements_right() );
+        std::copy(alignmentsright[i] + j*tb.alignments_per_instance(j)*tb.elements_per_alignment, alignmentsright[i] + (j+1)*tb.alignments_per_instance(j)*tb.elements_per_alignment, dataRightInput[i] + 80 + j * tb.instance_elements_right() );
       } else {
         std::copy(branchright[i],                                    branchright[i]+64,                                     dataRightInput[i] + j*tb.instance_elements_right()        );
-        std::copy(alignmentsright[i] + j*tb.elements_per_instance(), alignmentsright[i] + (j+1)*tb.elements_per_instance(), dataRightInput[i] + 64 + j * tb.instance_elements_right() );
+        std::copy(alignmentsright[i] + j*tb.alignments_per_instance(j)*tb.elements_per_alignment, alignmentsright[i] + (j+1)*tb.alignments_per_instance(j)*tb.elements_per_alignment, dataRightInput[i] + 64 + j * tb.instance_elements_right() );
       }
     }
   }
 
   // load wgt to s2mm
   for (unsigned long int i = 0; i < tb.alignment_sites; i++) {
-    wgt[i] = (i%3);
+    wgt[i] = 1;
   }
-  std::copy(wgt, wgt + tb.alignment_sites, dataOutput[0]);
+  //std::copy(wgt, wgt + tb.alignment_sites, dataOutput[0]);
 
-  out_buffer.write(dataOutput[0]);
-  out_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  //out_buffer.write(dataOutput[0]);
+  //out_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
-  for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
-    s2mm_run[j].set_arg(0, out_buffer);
-    s2mm_run[j].set_arg(3, 1);
-  }
-  for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-    s2mm_run[k].start();
-  }
-  for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-    s2mm_run[k].wait();
-  }
+  //for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+  //  s2mm_run[j].set_arg(0, out_buffer);
+  //  s2mm_run[j].set_arg(3, 1);
+  //}
+  //for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+  //  s2mm_run[k].start();
+  //}
+  //for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+  //  s2mm_run[k].wait();
+  //}
 
-  // reset s2mm param for execution
-  for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
-    s2mm_run[j].set_arg(0, out_plf[j]);
-    s2mm_run[j].set_arg(3, 0);
-  }
+  //// reset s2mm param for execution
+  //for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+  //  s2mm_run[j].set_arg(0, out_plf[j]);
+  //  s2mm_run[j].set_arg(3, 0);
+  //}
 
 
   //Run///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,7 +291,9 @@ int main(int argc, char* argv[]) {
 
     // Move data from ACAP Memory to host
     out_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+    bo_scalerIncrement.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
     out_buffer.read(dataOutput[i]);
+    bo_scalerIncrement.read(scalerIncrement_versal[i]);
 
     execution_ms.end[i] = t.elapsed();
   }
@@ -302,21 +310,34 @@ int main(int argc, char* argv[]) {
   std::string result = "Passed";
   unsigned int errors = 0;
 
+  int scalerIncrement_cpu[tb.plf_calls] = {0};
+
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
     reference_ms.t1[i] = t.elapsed();
-    plf(alignmentsleft[i], alignmentsright[i], checkOutput[i], ev[i], tb.alignment_sites, branchleft[i], branchright[i]);
+    plf(alignmentsleft[i], alignmentsright[i], checkOutput[i], ev[i], tb.alignment_sites, branchleft[i], branchright[i], wgt, scalerIncrement_cpu[i]);
     reference_ms.t2[i] = t.elapsed();
   }
 
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-    for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
-      if(dataOutput[i][j]!=checkOutput[i][j]) {
-        std::cout << "Failed at block: " << i << ", index: " << j << ", " << dataOutput[i][j] << "!=" << checkOutput[i][j] << std::endl;
-        errors++;
-        result = " Failed with " + std::to_string(errors) + " errors";
-        if (errors >= 20) {
-          result = " Failed with more than 20 errors";
-          break;
+    unsigned int scalerInc = 0;
+    for (unsigned int j = 0; j < tb.parallel_instances; j++) {
+      scalerInc += scalerIncrement_versal[i][j];
+    }
+    if (scalerIncrement_cpu[i]!=(int)scalerInc) {
+      std::cout << "ERROR: scalerIncrement wrong for call " << i << ", cpu!=versal: " << scalerIncrement_cpu[i] << "!=" << scalerInc << std::endl;
+    }
+  }
+  for (unsigned long int i = 0; i < tb.plf_calls; i++) {
+    for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
+      for (unsigned long int k = 0; k < tb.alignments_per_instance(j)*tb.elements_per_alignment; k++) {
+        if(dataOutput[i][(j*tb.instance_elements_out())+k]!=checkOutput[i][(j*tb.alignments_per_instance(j)*tb.elements_per_alignment)+k]) {
+          std::cout << "ERROR: alignment data wrong at block: " << i << ", index: " << j << ", cpu!=versal: " << checkOutput[i][(j*tb.alignments_per_instance(j)*tb.elements_per_alignment)+k] << "!=" << dataOutput[i][(j*tb.instance_elements_out())+k] << std::endl;
+          errors++;
+          result = " Failed with " + std::to_string(errors) + " errors";
+          if (errors >= 20) {
+            result = " Failed with more than 20 errors";
+            break;
+          }
         }
       }
     }
