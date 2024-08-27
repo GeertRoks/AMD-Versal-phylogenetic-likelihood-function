@@ -17,7 +17,7 @@
 
 extern "C" {
 
-  void s2mm(ap_uint<512>* mem, ap_uint<32>* scalerIncrement, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
+  void s2mm(ap_uint<512>* mem, char* scalerIncrement, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
 
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 #pragma HLS INTERFACE m_axi port=scalerIncrement offset=slave bundle=gmem
@@ -36,8 +36,6 @@ extern "C" {
     // Add one padding alignment if alignments is odd, because read per 2 in AIE
     unsigned int add_padding = (alignment_sites & 1);
 
-    unsigned int wgt = 1;
-    unsigned int addScale = 0;
 
     // Receive alignment site data
     for(unsigned int alignment = 0; alignment < alignment_sites+add_padding; alignment++) {
@@ -69,13 +67,14 @@ extern "C" {
         scale.bit(l) = !(fabs(x3[l]) <  minlikelihood);
       }
 
+      char addScale = 0;
       // perform scaling when needed
       if ( (scale==0) && (alignment<alignment_sites) ) {
         for (unsigned int l=0; l<16; l++) {
 #pragma HLS UNROLL factor=16
           x3[l] *= twotothe32;
         }
-        addScale += wgt;
+        addScale = 1;
       }
 
       //pack x3 -> buffer
@@ -88,8 +87,8 @@ extern "C" {
 
       // write combined data to memory
       mem[alignment] = buffer;
+      scalerIncrement[alignment] = addScale;
     }
-    *scalerIncrement = addScale;
 
   } // void s2mm()
 

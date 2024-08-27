@@ -145,7 +145,7 @@ struct testbench_info {
   unsigned int word_size = sizeof(float);
 
   unsigned long long int acap_mem_usage() {
-    unsigned long long int ram_per_instance = (this->instance_size_left()+this->instance_size_right()+this->instance_size_out() + sizeof(int));
+    unsigned long long int ram_per_instance = (this->instance_size_left()+this->instance_size_right()+this->instance_size_out() + sizeof(char)*this->alignments_per_instance());
     return ram_per_instance * this->parallel_instances;
   }
   unsigned long long int host_mem_usage() {

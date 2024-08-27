@@ -124,10 +124,11 @@ int main(int argc, char* argv[]) {
   xrt::bo* out_plf = new xrt::bo[tb.parallel_instances];
   xrt::bo* out_scaler = new xrt::bo[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
-    in_left_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_left(), xrt::bo::flags::normal, mm2sleft_kernels[i].group_id(0));
-    in_right_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_right(), xrt::bo::flags::normal, mm2sright_kernels[i].group_id(0));
-    out_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_out(), xrt::bo::flags::normal, s2mm_kernels[i].group_id(0));
-    out_scaler[i] = xrt::bo(*acap.get_device(), sizeof(int), xrt::bo::flags::normal, s2mm_kernels[i].group_id(1));
+    in_left_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_left(), xrt::bo::flags::device_only, mm2sleft_kernels[i].group_id(0));
+    in_right_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_right(), xrt::bo::flags::device_only, mm2sright_kernels[i].group_id(0));
+    out_plf[i] = xrt::bo(*acap.get_device(), tb.instance_size_out(), xrt::bo::flags::device_only, s2mm_kernels[i].group_id(0));
+    out_scaler[i] = xrt::bo(*acap.get_device(), sizeof(char)*tb.alignments_per_instance(), xrt::bo::flags::device_only, s2mm_kernels[i].group_id(1));
+    // TODO: properly account for alignment padding for the loops of both streams and windows
   }
 
   // Create the HLS kernel run handles and set the parameters
@@ -203,7 +204,8 @@ int main(int argc, char* argv[]) {
   }
 
   int wgt[tb.alignment_sites] = {0};
-  unsigned int scalerIncrement_versal[tb.plf_calls][tb.parallel_instances] = {0};
+  char scalerVector_versal[tb.plf_calls][tb.alignment_sites] = {0};
+  int scalerIncrement_versal[tb.plf_calls] = {0};
 
   float** versalResult = new float*[tb.plf_calls];
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
@@ -278,7 +280,9 @@ int main(int argc, char* argv[]) {
   std::cout << "Setup data gathering structures ... " << std::endl << std::endl;
   xrt::queue main_queue[tb.parallel_instances];
   xrt::queue right_queue[tb.parallel_instances];
-  xrt::queue::event right_finished[tb.parallel_instances];
+  xrt::queue::event right_in_finished[tb.parallel_instances];
+  xrt::queue::event right_out_finished[tb.parallel_instances];
+  xrt::queue::event execution_finished[tb.parallel_instances];
   xrt::queue::event done[tb.parallel_instances];
 
 
@@ -289,7 +293,7 @@ int main(int argc, char* argv[]) {
   }
   Timer t;
 
-  unsigned int* scaler;
+  char* scaler;
 
   std::cout << "Start PLF calculation on accelerator ... " << std::endl << std::endl;
   //t.reset();
@@ -298,33 +302,38 @@ int main(int argc, char* argv[]) {
   for (long int i = 0; i < tb.plf_calls; i++) {
     //TODO: add timer to measure one call that includes overhead of copying the output
 
-    scaler = scalerIncrement_versal[i];
 
+    // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+      // TODO: add bounds to the bo read and writes, so threads don't overwrite eachother
+
+      // set pointers for lamda functions
+      scaler = scalerVector_versal[i] + k*tb.alignments_per_instance(0);
 
       // time: begin
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].begin[i] = t.elapsed();});
 
       // write data to Versal
-      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); in_left_plf[k].sync(XCL_BO_SYNC_BO_TO_DEVICE); });
-      right_finished[k] = right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); in_right_plf[k].sync(XCL_BO_SYNC_BO_TO_DEVICE); });
-      main_queue[k].enqueue(right_finished[k]);
+      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); });
+      right_in_finished[k] = right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); });
+      main_queue[k].enqueue(right_in_finished[k]);
 
 
       // time: t1
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].t1[i] = t.elapsed();});
 
       // execute acceleration platform
-      main_queue[k].enqueue([&mm2sleft_run, &mm2sright_run, &s2mm_run, k] {s2mm_run[k].start(); mm2sleft_run[k].start(); mm2sright_run[k].start(); mm2sleft_run[k].wait(); mm2sright_run[k].wait(); s2mm_run[k].wait();});
+      execution_finished[k] = main_queue[k].enqueue([&mm2sleft_run, &mm2sright_run, &s2mm_run, k] {s2mm_run[k].start(); mm2sleft_run[k].start(); mm2sright_run[k].start(); mm2sleft_run[k].wait(); mm2sright_run[k].wait(); s2mm_run[k].wait();});
+      right_queue[k].enqueue(execution_finished[k]);
 
       // time: t2
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].t2[i] = t.elapsed();});
 
 
       // read data back from Versal
-      main_queue[k].enqueue([&out_plf, &dataOutput, k] {out_plf[k].sync(XCL_BO_SYNC_BO_FROM_DEVICE); out_plf[k].read(dataOutput[k]);});
-      right_finished[k] = right_queue[k].enqueue([&out_scaler, &scaler, k] {out_scaler[k].sync(XCL_BO_SYNC_BO_FROM_DEVICE); out_scaler[k].read(&scaler[k]);});
-      main_queue[k].enqueue(right_finished[k]);
+      main_queue[k].enqueue([&out_plf, &dataOutput, k] {out_plf[k].read(dataOutput[k]); });
+      right_out_finished[k] = right_queue[k].enqueue([&out_scaler, scaler, &tb, k] {out_scaler[k].read(scaler, sizeof(char)*tb.alignments_per_instance(k),0); });
+      main_queue[k].enqueue(right_out_finished[k]);
 
       // time: end
       done[k] = main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].end[i] = t.elapsed();});
@@ -336,6 +345,12 @@ int main(int argc, char* argv[]) {
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
       done[k].wait();
       std::copy(dataOutput[k], dataOutput[k]+tb.alignmentelements_per_instance(k), versalResult[i]+(k*tb.alignmentelements_per_instance(0)));
+    }
+
+    // Calculate scalerIncrement
+    scalerIncrement_versal[i] = 0;
+    for (unsigned int j = 0; j < tb.alignment_sites; j++) {
+      scalerIncrement_versal[i] += scalerVector_versal[i][j] * wgt[j];
     }
 
   }
@@ -378,15 +393,9 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // TODO: add scaler output check back in
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
-    unsigned int scalerInc = 0;
-    for (unsigned int j = 0; j < tb.parallel_instances; j++) {
-      scalerInc += scalerIncrement_versal[i][j];
-      std::cout << "scalerIncrement[" << i << "][" << j << "]: " << scalerIncrement_versal[i][j] << std::endl;
-    }
-    if (scalerIncrement_cpu[i]!=(int)scalerInc) {
-      std::cout << "ERROR: scalerIncrement wrong for call " << i << ", cpu!=versal: " << scalerIncrement_cpu[i] << "!=" << scalerInc << std::endl;
+    if (scalerIncrement_cpu[i]!=(int)scalerIncrement_versal[i]) {
+      std::cout << "ERROR: scalerIncrement wrong for call " << i << ", cpu!=versal: " << scalerIncrement_cpu[i] << "!=" << scalerIncrement_versal[i] << std::endl;
     }
   }
 

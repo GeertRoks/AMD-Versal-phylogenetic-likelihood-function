@@ -17,7 +17,7 @@
 
 extern "C" {
 
-  void s2mm(ap_uint<512>* mem, ap_uint<32>* scalerIncrement, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
+  void s2mm(ap_uint<512>* mem, char* scalerIncrement, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
 
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
 #pragma HLS INTERFACE m_axi port=scalerIncrement offset=slave bundle=gmem
@@ -40,8 +40,6 @@ extern "C" {
     const unsigned int remainder = alignment_sites - (num_full_windows*alignments_per_window);
     const unsigned int extra_window = (remainder > 0);
 
-    unsigned int wgt = 1;
-    unsigned int addScale = 0;
 
     // Receive alignment site data
     for(unsigned int window = 0; window < num_full_windows + extra_window; window++) {
@@ -76,13 +74,14 @@ extern "C" {
           scale.bit(l) = !(fabs(x3[l]) <  minlikelihood);
         }
 
+        char addScale = 0;
         // perform scaling when needed
         if ( (scale==0) && (((window*alignments_per_window)+alignment)<alignment_sites) ) {
           for (unsigned int l=0; l<16; l++) {
 #pragma HLS UNROLL factor=16
             x3[l] *= twotothe32;
           }
-          addScale += wgt;
+          addScale = 1;
         }
 
         //pack x3 -> buffer
@@ -95,9 +94,9 @@ extern "C" {
 
         // write buffer to memory
         mem[(window*alignments_per_window)+alignment] = buffer;
+        scalerIncrement[(window*alignments_per_window)+alignment] = addScale;
       }
     }
-    *scalerIncrement = addScale;
 
   } // void s2mm()
 
