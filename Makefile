@@ -179,6 +179,7 @@ run_hw_pcie:
 run_hw_gen:
 	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
 
+ALIGNMENTS ?= 100
 ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
 PLF_CALLS ?= 1
 INSTANCES_USED ?= 1
@@ -189,7 +190,7 @@ run_hw_gen_tests:
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN) 100 $(PLF_CALLS) $(INSTANCES_USED)
+	$(DIR_BUILD)/hw/host.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED)
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\

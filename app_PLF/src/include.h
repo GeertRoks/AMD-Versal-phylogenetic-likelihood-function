@@ -145,8 +145,8 @@ struct testbench_info {
   unsigned int word_size = sizeof(float);
 
   unsigned long long int acap_mem_usage() {
-    unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out());
-    return ram_per_plf*this->plf_calls;
+    unsigned long long int ram_per_instance = (this->instance_size_left()+this->instance_size_right()+this->instance_size_out() + sizeof(int));
+    return ram_per_instance * this->parallel_instances;
   }
   unsigned long long int host_mem_usage() {
     unsigned long long int ram_per_plf = (this->buffer_size_left()+this->buffer_size_right()+this->buffer_size_out()+this->buffer_size_out()+64+64+16+(2*(this->elements_per_plf()+this->alignments_padding_elements())));
@@ -166,6 +166,9 @@ struct testbench_info {
   }
   unsigned int alignments_per_instance() {
     return std::ceil((double)alignment_sites/(double)parallel_instances);
+  }
+  unsigned int alignmentelements_per_instance(unsigned int instance) {
+    return this->alignments_per_instance(instance)*this->elements_per_alignment;
   }
   unsigned int alignments_padding() {
     return (unsigned int)(this->alignments_per_instance()*this->parallel_instances) - this->alignment_sites;

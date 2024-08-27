@@ -23,23 +23,22 @@ private:
 };
 
 struct timing_data {
-  timing_data(size_t num_blocks) {
+  void init(size_t num_blocks) {
     this->num_blocks = num_blocks;
     this->begin = new double[num_blocks];
     this->t1 = new double[num_blocks];
     this->t2 = new double[num_blocks];
     this->end = new double[num_blocks];
   }
-  ~timing_data() {
-    //NOTE: gives double free if deletes are enabled??
-    //delete[] begin;
-    //delete[] t1;
-    //delete[] t2;
-    //delete[] end;
-    //begin = nullptr;
-    //t1 = nullptr;
-    //t2 = nullptr;
-    //end = nullptr;
+  void destroy() {
+    delete[] begin;
+    delete[] t1;
+    delete[] t2;
+    delete[] end;
+    begin = nullptr;
+    t1 = nullptr;
+    t2 = nullptr;
+    end = nullptr;
   }
   size_t num_blocks;
   double* begin;
@@ -151,11 +150,36 @@ void print_timing_data(timing_data d, timing_data r, double data_size, unsigned 
   std::cout << std::endl;
 }
 
-void write_to_csv(std::string filename, timing_data d) {
+void write_to_csv(std::string filename, timing_data* d, unsigned int instances) {
   std::ofstream outputFile(filename);
-  outputFile << "hm" << "," << "msasm" << "," << "mh" << std::endl;
-  for (unsigned int i = 0; i < d.num_blocks; i++) {
-    outputFile << d.hm(i) << "," << d.msm(i) << "," << d.mh(i) << std::endl;
+  for (unsigned int i = 0; i < instances; i++) {
+    outputFile << "hm" << i << ",";
+  }
+  for (unsigned int i = 0; i < instances; i++) {
+    outputFile << "msasm" << i << ",";
+  }
+  for (unsigned int i = 0; i < instances; i++) {
+    outputFile << "mh" << i;
+    if (i != instances-1) {
+      outputFile << ",";
+    }
+  }
+  outputFile << std::endl;
+
+  for (unsigned int call = 0; call < d[0].num_blocks; call++) {
+    for (unsigned int i = 0; i < instances; i++) {
+      outputFile << d[i].hm(call) << ",";
+    }
+    for (unsigned int i = 0; i < instances; i++) {
+      outputFile << d[i].msm(call) << ",";
+    }
+    for (unsigned int i = 0; i < instances; i++) {
+      outputFile << d[i].mh(call);
+      if (i != instances-1) {
+        outputFile << ",";
+      }
+    }
+    outputFile << std::endl;
   }
   outputFile.close();
 }
