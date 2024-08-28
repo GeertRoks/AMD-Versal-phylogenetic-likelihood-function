@@ -203,13 +203,17 @@ int main(int argc, char* argv[]) {
     alignmentsright_cpu[j] = dis(gen);
   }
 
-  int wgt[tb.alignment_sites] = {0};
-  char scalerVector_versal[tb.plf_calls][tb.alignment_sites] = {0};
-  int scalerIncrement_versal[tb.plf_calls] = {0};
+  int* wgt = new int[tb.alignment_sites];
+  for (unsigned long int i = 0; i < tb.alignment_sites; i++) {
+    wgt[i] = 1;
+  }
 
+  int* scalerIncrement_versal = new int[tb.plf_calls];
+  char** scalerVector_versal = new char*[tb.plf_calls];
   float** versalResult = new float*[tb.plf_calls];
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
     versalResult[i] = new float[tb.elements_per_plf()];
+    scalerVector_versal[i] = new char[tb.alignment_sites];
   }
 
   std::cout << "Prepare data for transfer ... " << std::endl;
@@ -250,9 +254,6 @@ int main(int argc, char* argv[]) {
 
 
   // load wgt to s2mm
-  for (unsigned long int i = 0; i < tb.alignment_sites; i++) {
-    wgt[i] = 1;
-  }
   //std::copy(wgt, wgt + tb.alignment_sites, dataOutput[0]);
 
   //out_buffer.write(dataOutput[0]);
@@ -357,12 +358,13 @@ int main(int argc, char* argv[]) {
   xrt_profile.end();
 
   //Check///////////////////////////////////////////////////////////////////////////////////////////////////
-  std::cout << "Data collected, checking for correctness ..." << std::endl;
 
   timing_data reference_ms;
   reference_ms.init(tb.plf_calls);
   //t.reset();
 
+#if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
+  std::cout << "Data collected, checking for correctness ..." << std::endl;
   // Test correctness of return data
   std::string result = "Passed";
   unsigned int errors = 0;
@@ -398,12 +400,13 @@ int main(int argc, char* argv[]) {
       std::cout << "ERROR: scalerIncrement wrong for call " << i << ", cpu!=versal: " << scalerIncrement_cpu[i] << "!=" << scalerIncrement_versal[i] << std::endl;
     }
   }
+  std::cout << std::endl;
+  std::cout << "Test result: " << result << std::endl;
+#endif
 
 
   //Result//////////////////////////////////////////////////////////////////////////////////////////////////
 
-  std::cout << std::endl;
-  std::cout << "Test result: " << result << std::endl;
   // TODO: print results for all threads in a table
   print_timing_data(execution_ms[0], reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
 
@@ -433,8 +436,11 @@ int main(int argc, char* argv[]) {
     delete[] alignmentsright[i];
   }
   for (unsigned int i = 0; i < tb.plf_calls; i++) {
+    delete[] scalerVector_versal[i];
     delete[] versalResult[i];
+#if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
     delete[] cpuResult[i];
+#endif
   }
 
   std::cout << "delete data arrays" << std::endl;
@@ -442,7 +448,12 @@ int main(int argc, char* argv[]) {
   delete[] dataRightInput;
   delete[] dataOutput;
   delete[] versalResult;
+#if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   delete[] cpuResult;
+#endif
+  delete[] scalerVector_versal;
+  delete[] scalerIncrement_versal;
+  delete[] wgt;
   delete[] alignmentsleft;
   delete[] alignmentsright;
   delete[] alignmentsleft_cpu;
@@ -451,7 +462,9 @@ int main(int argc, char* argv[]) {
   dataRightInput = nullptr;
   dataOutput = nullptr;
   versalResult = nullptr;
+#if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   cpuResult = nullptr;
+#endif
   alignmentsleft = nullptr;
   alignmentsright = nullptr;
 
