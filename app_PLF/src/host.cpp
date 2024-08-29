@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Argument(instances used) out of range" << std::endl;
   }
   // TODO: make window size automatically detected from xclbin name
-  tb.window_size = 8192;
+  tb.window_size = 1024;
   tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
   tb.aie_type = acap.classifyAieType(acap.get_pl_name());
@@ -183,8 +183,8 @@ int main(int argc, char* argv[]) {
   float ev[16];
   float branchleft[64];
   float branchright[64];
-  float* alignmentsleft_cpu = new float[tb.elements_per_plf()];
-  float* alignmentsright_cpu = new float[tb.elements_per_plf()];
+  float* alignmentsleft = new float[tb.elements_per_plf()];
+  float* alignmentsright = new float[tb.elements_per_plf()];
 
   // load ev
   for (unsigned long int j = 0; j < 16; j++) {
@@ -199,9 +199,8 @@ int main(int argc, char* argv[]) {
   for (unsigned long int j = 0; j < tb.elements_per_plf(); j++) {
     int exp = (j%64 < 16);
     float scale = std::pow(1.0e-12,exp);
-    alignmentsleft_cpu[j] = dis(gen) * scale;
-    //std::cout << "scale: " << scale << "left: " << alignmentsleft_cpu[j] << std::endl;
-    alignmentsright_cpu[j] = dis(gen);
+    alignmentsleft[j] = dis(gen) * scale;
+    alignmentsright[j] = dis(gen);
   }
 
   int* wgt = new int[tb.alignment_sites];
@@ -219,37 +218,25 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Prepare data for transfer ... " << std::endl;
 
-  float** alignmentsleft = new float*[tb.parallel_instances];
-  float** alignmentsright = new float*[tb.parallel_instances];
-
   float** dataLeftInput = new float*[tb.parallel_instances];
   float** dataRightInput = new float*[tb.parallel_instances];
-  //float** dataOutput = new float*[tb.parallel_instances];
 
-  for (unsigned long int i = 0; i < tb.parallel_instances; i++) {
-    alignmentsleft[i] = new float[tb.elements_per_instance()];
-    alignmentsright[i] = new float[tb.elements_per_instance()];
+  for (unsigned long int k = 0; k < tb.parallel_instances; k++) {
+    dataLeftInput[k] = new float[tb.instance_elements_left()];
+    dataRightInput[k] = new float[tb.instance_elements_right()];
 
-    dataLeftInput[i] = new float[tb.instance_elements_left()];
-    dataRightInput[i] = new float[tb.instance_elements_right()];
-    //dataOutput[i] = new float[tb.instance_elements_out()];
+    unsigned int alignment_offset = k*tb.alignmentelements_per_instance(0);
 
-    // load alignment data
-    for (unsigned long int j = 0; j < tb.alignmentelements_per_instance(i); j++) {
-      alignmentsleft[i][j] = alignmentsleft_cpu[tb.alignmentelements_per_instance(0)*i + j];
-      alignmentsright[i][j] = alignmentsright_cpu[tb.alignmentelements_per_instance(0)*i + j];
-    }
-
-    std::copy(ev,                ev+16,                                          dataLeftInput[i]      );
-    std::copy(branchleft,        branchleft+64,                                  dataLeftInput[i] + 16 );
-    std::copy(alignmentsleft[i], alignmentsleft[i] + tb.elements_per_instance(), dataLeftInput[i] + 80 );
+    std::copy(ev,                ev+16,                                          dataLeftInput[k]      );
+    std::copy(branchleft,        branchleft+64,                                  dataLeftInput[k] + 16 );
+    std::copy(&alignmentsleft[alignment_offset], &alignmentsleft[alignment_offset + tb.alignmentelements_per_instance(k)], dataLeftInput[k] + 80 );
     if (tb.input_layout == ONE_INEV) {
-      std::copy(ev,                 ev+16,                                           dataRightInput[i]      );
-      std::copy(branchright,        branchright+64,                                  dataRightInput[i] + 16 );
-      std::copy(alignmentsright[i], alignmentsright[i] + tb.elements_per_instance(), dataRightInput[i] + 80 );
+      std::copy(ev,                 ev+16,                                           dataRightInput[k]      );
+      std::copy(branchright,        branchright+64,                                  dataRightInput[k] + 16 );
+      std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 80 );
     } else {
-      std::copy(branchright,        branchright+64,                                  dataRightInput[i]      );
-      std::copy(alignmentsright[i], alignmentsright[i] + tb.elements_per_instance(), dataRightInput[i] + 64 );
+      std::copy(branchright,        branchright+64,                                  dataRightInput[k]      );
+      std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 64 );
     }
   }
 
@@ -295,7 +282,6 @@ int main(int argc, char* argv[]) {
 #if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
     // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      // TODO: add bounds to the bo writes, so the padding is not transferred over pcie
 
       // set pointers for lamda functions
       scaler = scalerVector_versal[i] + k*tb.alignments_per_instance(0);
@@ -305,8 +291,8 @@ int main(int argc, char* argv[]) {
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].begin[i] = t.elapsed();});
 
       // write data to Versal
-      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); });
-      right_in_finished[k] = right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); });
+      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, &tb, k] {in_left_plf[k].write(dataLeftInput[k], tb.instance_active_elements_left(k)*sizeof(float), 0); });
+      right_in_finished[k] = right_queue[k].enqueue([&in_right_plf, &dataRightInput, &tb, k] {in_right_plf[k].write(dataRightInput[k],tb.instance_active_elements_right(k)*sizeof(float), 0); });
       main_queue[k].enqueue(right_in_finished[k]);
 
       // time: t1
@@ -340,15 +326,14 @@ int main(int argc, char* argv[]) {
 
     // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      // TODO: add bounds to the bo writes, so the padding is not transferred over pcie
 
       // set pointers for lamda functions
       scaler = scalerVector_versal[i] + k*tb.alignments_per_instance(0);
       dataOutput = versalResult[i] + (k*tb.alignmentelements_per_instance(0));
 
       // write data to Versal
-      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); });
-      right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); });
+      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, &tb, k] {in_left_plf[k].write(dataLeftInput[k], tb.instance_active_elements_left(k)*sizeof(float), 0); });
+      right_queue[k].enqueue([&in_right_plf, &dataRightInput, &tb, k] {in_right_plf[k].write(dataRightInput[k],tb.instance_active_elements_right(k)*sizeof(float), 0); });
 
 
       // execute acceleration platform
@@ -409,7 +394,7 @@ int main(int argc, char* argv[]) {
 
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
     reference_ms.t1[i] = t.elapsed();
-    plf(alignmentsleft_cpu, alignmentsright_cpu, cpuResult[i], ev, tb.alignment_sites, branchleft, branchright, wgt, scalerIncrement_cpu[i]);
+    plf(alignmentsleft, alignmentsright, cpuResult[i], ev, tb.alignment_sites, branchleft, branchright, wgt, scalerIncrement_cpu[i]);
     reference_ms.t2[i] = t.elapsed();
   }
   for (unsigned long int i = 0; i < tb.plf_calls; i++) {
@@ -484,9 +469,6 @@ int main(int argc, char* argv[]) {
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     delete[] dataLeftInput[i];
     delete[] dataRightInput[i];
-    //delete[] dataOutput[i];
-    delete[] alignmentsleft[i];
-    delete[] alignmentsright[i];
   }
   for (unsigned int i = 0; i < tb.plf_calls; i++) {
     delete[] scalerVector_versal[i];
@@ -499,7 +481,6 @@ int main(int argc, char* argv[]) {
   std::cout << "delete data arrays" << std::endl;
   delete[] dataLeftInput;
   delete[] dataRightInput;
-  //delete[] dataOutput;
   delete[] versalResult;
 #if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   delete[] cpuResult;
@@ -509,11 +490,8 @@ int main(int argc, char* argv[]) {
   delete[] wgt;
   delete[] alignmentsleft;
   delete[] alignmentsright;
-  delete[] alignmentsleft_cpu;
-  delete[] alignmentsright_cpu;
   dataLeftInput = nullptr;
   dataRightInput = nullptr;
-  //dataOutput = nullptr;
   versalResult = nullptr;
 #if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   cpuResult = nullptr;

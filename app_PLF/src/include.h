@@ -187,6 +187,21 @@ struct testbench_info {
     return this->instance_elements_out() * this->parallel_instances;
   }
 
+  unsigned int instance_active_elements_left(unsigned int instance) {
+    return this->alignmentelements_per_instance(instance) + 5*16;
+  }
+  unsigned int instance_active_elements_right(unsigned int instance) {
+    unsigned int result = this->alignmentelements_per_instance(instance);
+    switch (input_layout) {
+      case TWO_IN:
+        result += 4*16;
+        break;
+      case ONE_INEV:
+        result += 5*16;
+        break;
+    }
+    return result;
+  }
   unsigned int instance_elements_left() {
     return this->elements_per_instance() + 5*16;
   }
@@ -208,6 +223,9 @@ struct testbench_info {
 
   unsigned int elements_per_plf() {
     return this->alignment_sites * this->elements_per_alignment;
+  }
+  unsigned int elements_padding_per_instance(unsigned int instance) {
+    return this->elements_per_instance() - this->alignmentelements_per_instance(instance);
   }
   unsigned int elements_per_instance() {
     unsigned int result = 0;
