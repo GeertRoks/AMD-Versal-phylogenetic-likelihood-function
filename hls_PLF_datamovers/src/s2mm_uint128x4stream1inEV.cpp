@@ -19,8 +19,8 @@ extern "C" {
 
   void s2mm(ap_uint<512>* mem, char* scalerIncrement, unsigned int alignment_sites, unsigned int window_size, hls::stream<ap_axiu<128,0,0,0>>& s0, hls::stream<ap_axiu<128,0,0,0>>& s1, hls::stream<ap_axiu<128,0,0,0>>& s2, hls::stream<ap_axiu<128,0,0,0>>& s3) {
 
-#pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem
-#pragma HLS INTERFACE m_axi port=scalerIncrement offset=slave bundle=gmem
+#pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem0
+#pragma HLS INTERFACE m_axi port=scalerIncrement offset=slave bundle=gmem1
 
 #pragma HLS interface axis port=s0
 #pragma HLS interface axis port=s1
