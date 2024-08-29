@@ -36,7 +36,8 @@ int main(int argc, char* argv[]) {
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(instances used) out of range" << std::endl;
   }
-  tb.window_size = 1024;
+  // TODO: make window size automatically detected from xclbin name
+  tb.window_size = 8192;
   tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
   tb.aie_type = acap.classifyAieType(acap.get_pl_name());
@@ -223,7 +224,7 @@ int main(int argc, char* argv[]) {
 
   float** dataLeftInput = new float*[tb.parallel_instances];
   float** dataRightInput = new float*[tb.parallel_instances];
-  float** dataOutput = new float*[tb.parallel_instances];
+  //float** dataOutput = new float*[tb.parallel_instances];
 
   for (unsigned long int i = 0; i < tb.parallel_instances; i++) {
     alignmentsleft[i] = new float[tb.elements_per_instance()];
@@ -231,7 +232,7 @@ int main(int argc, char* argv[]) {
 
     dataLeftInput[i] = new float[tb.instance_elements_left()];
     dataRightInput[i] = new float[tb.instance_elements_right()];
-    dataOutput[i] = new float[tb.instance_elements_out()];
+    //dataOutput[i] = new float[tb.instance_elements_out()];
 
     // load alignment data
     for (unsigned long int j = 0; j < tb.alignmentelements_per_instance(i); j++) {
@@ -253,63 +254,52 @@ int main(int argc, char* argv[]) {
   }
 
 
-  // load wgt to s2mm
-  //std::copy(wgt, wgt + tb.alignment_sites, dataOutput[0]);
-
-  //out_buffer.write(dataOutput[0]);
-  //out_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-//for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
-  //  s2mm_run[j].set_arg(0, out_buffer);
-  //  s2mm_run[j].set_arg(3, 1);
-  //}
-  //for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-  //  s2mm_run[k].start();
-  //}
-  //for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-  //  s2mm_run[k].wait();
-  //}
-
-  //// reset s2mm param for execution
-  //for (unsigned long int j = 0; j < tb.parallel_instances; j++) {
-  //  s2mm_run[j].set_arg(0, out_plf[j]);
-  //  s2mm_run[j].set_arg(3, 0);
-  //}
-
-
   //Run///////////////////////////////////////////////////////////////////////////////////////////////////
 
   std::cout << "Setup data gathering structures ... " << std::endl << std::endl;
   xrt::queue main_queue[tb.parallel_instances];
   xrt::queue right_queue[tb.parallel_instances];
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
   xrt::queue::event right_in_finished[tb.parallel_instances];
   xrt::queue::event right_out_finished[tb.parallel_instances];
+#else
+  xrt::queue output_queue[tb.parallel_instances];
+  xrt::queue::event output_done[tb.parallel_instances];
+#endif
   xrt::queue::event execution_finished[tb.parallel_instances];
-  xrt::queue::event done[tb.parallel_instances];
+  xrt::queue::event instance_done[tb.parallel_instances];
 
 
-  auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
   timing_data* execution_ms = new timing_data[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     execution_ms[i].init(tb.plf_calls);
   }
+#else
+  timing_data execution_ms;
+  execution_ms.init(tb.plf_calls);
+#endif
+
+  auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
   Timer t;
 
   char* scaler;
+  float* dataOutput;
 
   std::cout << "Start PLF calculation on accelerator ... " << std::endl << std::endl;
   //t.reset();
 
   xrt_profile.start("roundtrip_exec_time");
   for (long int i = 0; i < tb.plf_calls; i++) {
-    //TODO: add timer to measure one call that includes overhead of copying the output
 
-
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
     // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      // TODO: add bounds to the bo read and writes, so threads don't overwrite eachother
+      // TODO: add bounds to the bo writes, so the padding is not transferred over pcie
 
       // set pointers for lamda functions
       scaler = scalerVector_versal[i] + k*tb.alignments_per_instance(0);
+      dataOutput = versalResult[i] + (k*tb.alignmentelements_per_instance(0));
 
       // time: begin
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].begin[i] = t.elapsed();});
@@ -318,7 +308,6 @@ int main(int argc, char* argv[]) {
       main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); });
       right_in_finished[k] = right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); });
       main_queue[k].enqueue(right_in_finished[k]);
-
 
       // time: t1
       main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].t1[i] = t.elapsed();});
@@ -332,27 +321,69 @@ int main(int argc, char* argv[]) {
 
 
       // read data back from Versal
-      main_queue[k].enqueue([&out_plf, &dataOutput, k] {out_plf[k].read(dataOutput[k]); });
+      main_queue[k].enqueue([&out_plf, dataOutput, &tb, k] {out_plf[k].read(dataOutput, sizeof(float)*tb.alignmentelements_per_instance(k), 0); });
       right_out_finished[k] = right_queue[k].enqueue([&out_scaler, scaler, &tb, k] {out_scaler[k].read(scaler, sizeof(char)*tb.alignments_per_instance(k),0); });
       main_queue[k].enqueue(right_out_finished[k]);
 
       // time: end
-      done[k] = main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].end[i] = t.elapsed();});
+      instance_done[k] = main_queue[k].enqueue([&execution_ms, k, i, t] {execution_ms[k].end[i] = t.elapsed();});
 
     }
-
 
     // Sync all threads
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      done[k].wait();
-      std::copy(dataOutput[k], dataOutput[k]+tb.alignmentelements_per_instance(k), versalResult[i]+(k*tb.alignmentelements_per_instance(0)));
+      instance_done[k].wait();
     }
+
+#else
+    execution_ms.begin[i] = t.elapsed();
+
+    // Execute PLF calculation parallelized on Versal
+    for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+      // TODO: add bounds to the bo writes, so the padding is not transferred over pcie
+
+      // set pointers for lamda functions
+      scaler = scalerVector_versal[i] + k*tb.alignments_per_instance(0);
+      dataOutput = versalResult[i] + (k*tb.alignmentelements_per_instance(0));
+
+      // write data to Versal
+      main_queue[k].enqueue([&in_left_plf, &dataLeftInput, k] {in_left_plf[k].write(dataLeftInput[k]); });
+      right_queue[k].enqueue([&in_right_plf, &dataRightInput, k] {in_right_plf[k].write(dataRightInput[k]); });
+
+
+      // execute acceleration platform
+      main_queue[k].enqueue([&mm2sleft_run, k] {mm2sleft_run[k].start(); mm2sleft_run[k].wait();});
+      right_queue[k].enqueue([&mm2sright_run, k] {mm2sright_run[k].start(); mm2sright_run[k].wait();});
+      execution_finished[k] = output_queue[k].enqueue([&s2mm_run, k] {s2mm_run[k].start(); s2mm_run[k].wait();});
+
+
+      // read data back from Versal
+      main_queue[k].enqueue(execution_finished[k]);
+      main_queue[k].enqueue([&out_scaler, scaler, &tb, k] {out_scaler[k].read(scaler, sizeof(char)*tb.alignments_per_instance(k), 0); });
+      output_done[k] = output_queue[k].enqueue([&out_plf, dataOutput, &tb, k] {out_plf[k].read(dataOutput, sizeof(float)*tb.alignmentelements_per_instance(k), 0); });
+      instance_done[k] = main_queue[k].enqueue(output_done[k]);
+
+    }
+
+    // Sync all threads
+    for (unsigned int k = 0; k < tb.parallel_instances; k++) {
+      instance_done[k].wait();
+    }
+
+    execution_ms.t1[i] = t.elapsed();
+    execution_ms.t2[i] = t.elapsed();
+
+#endif
 
     // Calculate scalerIncrement
     scalerIncrement_versal[i] = 0;
     for (unsigned int j = 0; j < tb.alignment_sites; j++) {
       scalerIncrement_versal[i] += scalerVector_versal[i][j] * wgt[j];
     }
+
+#if defined(NO_INTERMEDIATE_RESULTS) && NO_INTERMEDIATE_RESULTS == 1
+    execution_ms.end[i] = t.elapsed();
+#endif
 
   }
   xrt_profile.end();
@@ -408,30 +439,52 @@ int main(int argc, char* argv[]) {
   //Result//////////////////////////////////////////////////////////////////////////////////////////////////
 
   // TODO: print results for all threads in a table
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
   print_timing_data(execution_ms[0], reference_ms, (double)tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
-
-
   if (acap.get_target() == "hw") {
     std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + std::to_string(tb.plf_calls) + "_alignments" + std::to_string(tb.alignment_sites) + "_usedgraphs" + std::to_string(tb.parallel_instances) + ".csv";
     write_to_csv(csvFile, execution_ms, tb.parallel_instances);
   }
+#else
+  std::cout << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) | bandwidth (alignments/s) |" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  std::cout << "| PLF on Versal:                         | " << std::setw(10) << execution_ms.hm() << " | ";
+  std::cout << std::setw(16) << bandwidth_MBs(execution_ms.hm(), (double)tb.data_size())    << " | ";
+  std::cout << std::setw(24) << bandwidth_As(execution_ms.hm(), tb.alignment_sites*tb.plf_calls) << " |" << std::endl;
+  std::cout << "| scaling wgt mult:                      | " << std::setw(10) << execution_ms.mh() << " | ";
+  std::cout << std::setw(16) << bandwidth_MBs(execution_ms.mh(), (double)tb.data_size())    << " | ";
+  std::cout << std::setw(24) << bandwidth_As(execution_ms.mh(), tb.alignment_sites*tb.plf_calls) << " |" << std::endl;
+  std::cout << "=====================================================================================================" << std::endl;
+  if (acap.get_target() == "hw") {
+    std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + std::to_string(tb.plf_calls) + "_alignments" + std::to_string(tb.alignment_sites) + "_usedgraphs" + std::to_string(tb.parallel_instances) + ".csv";
+    write_to_csv(csvFile, execution_ms);
+  }
+#endif
+
+
 
   //Cleanup////////////////////////////////////////////////////////////////////////////////////////////////
 
 
   std::cout << "delete timing struct" << std::endl;
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     execution_ms[i].destroy();
   }
   reference_ms.destroy();
   delete[] execution_ms;
   execution_ms = nullptr;
+#else
+  execution_ms.destroy();
+#endif
 
   std::cout << "delete inner data arrays" << std::endl;
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     delete[] dataLeftInput[i];
     delete[] dataRightInput[i];
-    delete[] dataOutput[i];
+    //delete[] dataOutput[i];
     delete[] alignmentsleft[i];
     delete[] alignmentsright[i];
   }
@@ -446,7 +499,7 @@ int main(int argc, char* argv[]) {
   std::cout << "delete data arrays" << std::endl;
   delete[] dataLeftInput;
   delete[] dataRightInput;
-  delete[] dataOutput;
+  //delete[] dataOutput;
   delete[] versalResult;
 #if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   delete[] cpuResult;
@@ -460,7 +513,7 @@ int main(int argc, char* argv[]) {
   delete[] alignmentsright_cpu;
   dataLeftInput = nullptr;
   dataRightInput = nullptr;
-  dataOutput = nullptr;
+  //dataOutput = nullptr;
   versalResult = nullptr;
 #if !defined(NO_CORRECTNESS_CHECK) || NO_CORRECTNESS_CHECK == 0
   cpuResult = nullptr;

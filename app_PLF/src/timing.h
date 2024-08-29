@@ -46,35 +46,35 @@ struct timing_data {
   double* t2;
   double* end;
 
-  double hm(int i) { return t1[i] - begin[i]; };
-  double msm(int i) { return t2[i] - t1[i]; };
-  double mh(int i) { return end[i] - t2[i]; };
-  double total(int i) { return end[i] - begin[i]; };
-  double hm() {
+  double hm(int i) const { return t1[i] - begin[i]; };
+  double msm(int i) const { return t2[i] - t1[i]; };
+  double mh(int i) const { return end[i] - t2[i]; };
+  double total(int i) const { return end[i] - begin[i]; };
+  double hm() const {
     double result = 0.0f;
     for (unsigned int i = 0; i < num_blocks; i++) {
       result += t1[i] - begin[i];
     }
     return result;
   };
-  double msm() {
+  double msm() const {
     double result = 0.0f;
     for (unsigned int i = 0; i < num_blocks; i++) {
       result += t2[i] - t1[i];
     }
     return result;
   };
-  double mh() {
+  double mh() const {
     double result = 0.0f;
     for (unsigned int i = 0; i < num_blocks; i++) {
       result += end[i] - t2[i];
     }
     return result;
   };
-  double total() {
+  double total() const {
     return end[num_blocks-1] - begin[0];
   };
-  double max_msm() {
+  double max_msm() const {
     double max_val = DBL_MIN;
     double temp = 0.0f;
     for (unsigned int i = 0; i < num_blocks; i++) {
@@ -85,7 +85,7 @@ struct timing_data {
     }
     return max_val;
   }
-  double min_msm() {
+  double min_msm() const {
     double min_val = DBL_MAX;
     double temp = 0.0f;
     for (unsigned int i = 0; i < num_blocks; i++) {
@@ -148,6 +148,15 @@ void print_timing_data(timing_data d, timing_data r, double data_size, unsigned 
   std::cout << std::setw(56) << r.msm()/d.total() << " |" << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
   std::cout << std::endl;
+}
+
+void write_to_csv(std::string filename, const timing_data &d) {
+  std::ofstream outputFile(filename);
+  outputFile << "plf,scaling" << std::endl;
+  for (unsigned int call = 0; call < d.num_blocks; call++) {
+    outputFile << d.hm(call) << "," << d.mh(call) << std::endl;
+  }
+  outputFile.close();
 }
 
 void write_to_csv(std::string filename, timing_data* d, unsigned int instances) {
