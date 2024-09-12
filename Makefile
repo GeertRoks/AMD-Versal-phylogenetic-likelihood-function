@@ -9,7 +9,6 @@
 # TARGET:      <sw_emu, hw_emu, hw> (default: sw_emu)
 # PL:          <uint32, uint128, uint512, qdma32, qdma128, qdma512>
 # AIE:         <streams: (bitwidth)stream(vector operations)[for], windows: (bitwidth)window(windowsize)(vector operations)[for]>
-# BUFFER_SIZE: <natural number> (default: 1048576)
 # BLOCKS:      <natural number> (default: 1)
 
 
@@ -108,7 +107,7 @@ else ifeq ($(PL),genstream2in)
 endif
 
 #v++ flags
-VPP_PROFILE_FLAGS := --profile.stall=all:all:all --profile.data=all:all:all
+#VPP_PROFILE_FLAGS := --profile.stall=all:all:all --profile.data=all:all:all
 #VPP_PROFILE_FLAGS := --profile.aie=all --profile.stall=all:all:all --profile.data=all:all:all --profile.exec=all:all
 VPP_VIVADO_FLAGS := --vivado.impl.jobs 8 --vivado.synth.jobs 8
 VPP_PACKAGE_FLAGS := --package.boot_mode ospi --package.out_dir $(DIR_BUILD)/$(TARGET)/package
@@ -121,8 +120,8 @@ GCC_HOST_INCLUDES := -I$(DIR_HOST)/src -I${XILINX_XRT}/include -L${XILINX_XRT}/l
 GCC_HOST_LIBS := -lxrt_coreutil -luuid -pthread
 
 ifdef PL_FREQ
-	#VPP_LINK_CLOCK_FLAGS := --clock.freqHz $(PL_FREQ)000000:mm2s_0,s2mm_0 --clock.freqHz $(AIE_FREQ)000000:ai_engine_0
-	VPP_LINK_CLOCK_FLAGS := --kernel_frequency 0:$(PL_FREQ)
+	VPP_LINK_CLOCK_FLAGS := --clock.freqHz $(PL_FREQ)000000:$(shell for i in $$(seq 0 $$(($(NUM_AIE_IO)-1))); do echo -n "mm2sleft_$$i,mm2sright_$$i,s2mm_$$i,"; done | sed 's/,$$//')
+	#VPP_LINK_CLOCK_FLAGS := --kernel_frequency 0:$(PL_FREQ)
 	VPP_AIE_FLAGS := --pl-freq=$(PL_FREQ)
 	GCC_HOST_FLAGS += -DPL_FREQ=$(PL_FREQ)
 endif
@@ -173,34 +172,30 @@ CURRENT_DATE_TIME := $(shell date +%Y%m%d-%H%M%S)
 PROJECT_ROOT := $(shell pwd)
 DIR_EMU_LOGS := emulation
 
-BUFFER_SIZE ?= 8388608
-CHUNK_SIZE ?= 1048576
-
-CHUNK_SIZES ?= 1048576 2097152 4194304
-BUFFER_SIZES ?= 33554432
-
 run_hw_pcie:
 	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
-
-run_hw_gen:
-	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) 10000
 
 ALIGNMENTS ?= 100
 ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
 PLF_CALLS ?= 1
 INSTANCES_USED ?= 1
+#TODO: read window size from xclbin instead of separate input parameter
+WINDOW_SIZE ?= 1024
+
+run_hw_gen:
+	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
 
 run_hw_gen_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments; \
+		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED)
+	$(DIR_BUILD)/hw/host.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED); \
+		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
 	done
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json

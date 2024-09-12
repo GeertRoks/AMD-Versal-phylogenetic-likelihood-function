@@ -10,8 +10,8 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 5)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used>\n");
+  if(argc != 6)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used> <window size>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
@@ -37,7 +37,13 @@ int main(int argc, char* argv[]) {
     std::cerr << "Argument(instances used) out of range" << std::endl;
   }
   // TODO: make window size automatically detected from xclbin name
-  tb.window_size = 1024;
+  try {
+    tb.window_size = std::stoul(argv[5]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid window size: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(window size) out of range" << std::endl;
+  }
   tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
   tb.aie_type = acap.classifyAieType(acap.get_pl_name());
@@ -225,6 +231,7 @@ int main(int argc, char* argv[]) {
     dataLeftInput[k] = new float[tb.instance_elements_left()];
     dataRightInput[k] = new float[tb.instance_elements_right()];
 
+#if !defined(NO_INTERMEDIATE_RESULTS) || NO_INTERMEDIATE_RESULTS == 0
     unsigned int alignment_offset = k*tb.alignmentelements_per_instance(0);
 
     std::copy(ev,                ev+16,                                          dataLeftInput[k]      );
@@ -238,6 +245,7 @@ int main(int argc, char* argv[]) {
       std::copy(branchright,        branchright+64,                                  dataRightInput[k]      );
       std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 64 );
     }
+#endif
   }
 
 
@@ -251,6 +259,7 @@ int main(int argc, char* argv[]) {
   xrt::queue::event right_out_finished[tb.parallel_instances];
 #else
   xrt::queue output_queue[tb.parallel_instances];
+  xrt::queue::event right_done[tb.parallel_instances];
   xrt::queue::event output_done[tb.parallel_instances];
 #endif
   xrt::queue::event execution_finished[tb.parallel_instances];
@@ -324,6 +333,24 @@ int main(int argc, char* argv[]) {
 #else
     execution_ms.begin[i] = t.elapsed();
 
+    for (unsigned long int k = 0; k < tb.parallel_instances; k++) {
+      unsigned int alignment_offset = k*tb.alignmentelements_per_instance(0);
+
+      std::copy(ev,                ev+16,                                          dataLeftInput[k]      );
+      std::copy(branchleft,        branchleft+64,                                  dataLeftInput[k] + 16 );
+      std::copy(&alignmentsleft[alignment_offset], &alignmentsleft[alignment_offset + tb.alignmentelements_per_instance(k)], dataLeftInput[k] + 80 );
+      if (tb.input_layout == ONE_INEV) {
+        std::copy(ev,                 ev+16,                                           dataRightInput[k]      );
+        std::copy(branchright,        branchright+64,                                  dataRightInput[k] + 16 );
+        std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 80 );
+      } else {
+        std::copy(branchright,        branchright+64,                                  dataRightInput[k]      );
+        std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 64 );
+      }
+    }
+
+    execution_ms.t1[i] = t.elapsed();
+
     // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
 
@@ -338,11 +365,12 @@ int main(int argc, char* argv[]) {
 
       // execute acceleration platform
       main_queue[k].enqueue([&mm2sleft_run, k] {mm2sleft_run[k].start(); mm2sleft_run[k].wait();});
-      right_queue[k].enqueue([&mm2sright_run, k] {mm2sright_run[k].start(); mm2sright_run[k].wait();});
+      right_done[k] = right_queue[k].enqueue([&mm2sright_run, k] {mm2sright_run[k].start(); mm2sright_run[k].wait();});
       execution_finished[k] = output_queue[k].enqueue([&s2mm_run, k] {s2mm_run[k].start(); s2mm_run[k].wait();});
 
 
       // read data back from Versal
+      main_queue[k].enqueue(right_done[k]);
       main_queue[k].enqueue(execution_finished[k]);
       main_queue[k].enqueue([&out_scaler, scaler, &tb, k] {out_scaler[k].read(scaler, sizeof(char)*tb.alignments_per_instance(k), 0); });
       output_done[k] = output_queue[k].enqueue([&out_plf, dataOutput, &tb, k] {out_plf[k].read(dataOutput, sizeof(float)*tb.alignmentelements_per_instance(k), 0); });
@@ -355,7 +383,6 @@ int main(int argc, char* argv[]) {
       instance_done[k].wait();
     }
 
-    execution_ms.t1[i] = t.elapsed();
     execution_ms.t2[i] = t.elapsed();
 
 #endif
@@ -433,14 +460,17 @@ int main(int argc, char* argv[]) {
 #else
   std::cout << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
-  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) | bandwidth (alignments/s) |" << std::endl;
+  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) |         bandwidth (MA/s) |" << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
-  std::cout << "| PLF on Versal:                         | " << std::setw(10) << execution_ms.hm() << " | ";
+  std::cout << "| Prepare input for Versal:              | " << std::setw(10) << execution_ms.hm() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(execution_ms.hm(), (double)tb.data_size())    << " | ";
-  std::cout << std::setw(24) << bandwidth_As(execution_ms.hm(), tb.alignment_sites*tb.plf_calls) << " |" << std::endl;
+  std::cout << std::setw(24) << bandwidth_As(execution_ms.hm(), tb.alignment_sites*tb.plf_calls) * 1e-6 << " |" << std::endl;
+  std::cout << "| PLF on Versal:                         | " << std::setw(10) << execution_ms.msm() << " | ";
+  std::cout << std::setw(16) << bandwidth_MBs(execution_ms.msm(), (double)tb.data_size())    << " | ";
+  std::cout << std::setw(24) << bandwidth_As(execution_ms.msm(), tb.alignment_sites*tb.plf_calls) * 1e-6 << " |" << std::endl;
   std::cout << "| scaling wgt mult:                      | " << std::setw(10) << execution_ms.mh() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(execution_ms.mh(), (double)tb.data_size())    << " | ";
-  std::cout << std::setw(24) << bandwidth_As(execution_ms.mh(), tb.alignment_sites*tb.plf_calls) << " |" << std::endl;
+  std::cout << std::setw(24) << bandwidth_As(execution_ms.mh(), tb.alignment_sites*tb.plf_calls) * 1e-6 << " |" << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
   if (acap.get_target() == "hw") {
     std::string csvFile = std::string("data_hw_runs/") + acap.get_app_name() + "_" + acap.get_aie_name() + "_" + acap.get_pl_name() + "_plfs" + std::to_string(tb.plf_calls) + "_alignments" + std::to_string(tb.alignment_sites) + "_usedgraphs" + std::to_string(tb.parallel_instances) + ".csv";

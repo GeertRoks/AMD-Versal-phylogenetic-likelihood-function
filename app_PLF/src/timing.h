@@ -107,40 +107,40 @@ unsigned long int bandwidth_As(double time_ms, double alignments) {
 void print_timing_data(timing_data d, timing_data r, double data_size, unsigned int total_alignments, unsigned int calls) {
   std::cout << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
-  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) | bandwidth (alignments/s) |" << std::endl;
+  std::cout << "| Timing region                          | time (ms)  | bandwidth (MB/s) |         bandwidth (MA/s) |" << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
   std::cout << "| Host to ACAP memory:                   | " << std::setw(10) << d.hm() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(d.hm(), data_size)    << " | ";
-  std::cout << std::setw(24) << bandwidth_As(d.hm(), total_alignments) << " |" << std::endl;
+  std::cout << std::setw(24) << bandwidth_As(d.hm(), total_alignments) * 1e-6 << " |" << std::endl;
   if (d.msm() > 0.005) {
     std::cout << "| ACAP memory to PL/AIE to ACAP memory:  | ";
     std::cout << std::setw(10) << d.msm() <<  " | ";
     std::cout << std::setw(16) << bandwidth_MBs(d.msm(), data_size) << " | ";
-    std::cout << std::setw(24) << bandwidth_As(d.msm(), total_alignments) << " |" << std::endl;
+    std::cout << std::setw(24) << bandwidth_As(d.msm(), total_alignments) * 1e-6 << " |" << std::endl;
     std::cout << std::left;
     std::cout << "|   - slowest:                           | ";
     std::cout << std::setw(10) << d.max_msm() << " | ";
     std::cout << std::setw(16) << bandwidth_MBs(d.max_msm(), data_size/calls) << " | ";
-    std::cout << std::setw(24) << bandwidth_As(d.max_msm(), total_alignments/calls) << " |" << std::endl;
+    std::cout << std::setw(24) << bandwidth_As(d.max_msm(), total_alignments/calls) * 1e-6 << " |" << std::endl;
     std::cout << "|   - fastest:                           | ";
     std::cout << std::setw(10) << d.min_msm() << " | ";
     std::cout << std::setw(16) << bandwidth_MBs(d.min_msm(), data_size/calls) << " | ";
-    std::cout << std::setw(24) << bandwidth_As(d.min_msm(), total_alignments/calls) << " |";
+    std::cout << std::setw(24) << bandwidth_As(d.min_msm(), total_alignments/calls) * 1e-6 << " |";
     std::cout << std::right << std::endl;
   }
   std::cout << "| ACAP memory to host:                   | " << std::setw(10) << d.mh() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(d.mh(), data_size)    << " | ";
-    std::cout << std::setw(24) << bandwidth_As(d.mh(), total_alignments) << " |" << std::endl;
+    std::cout << std::setw(24) << bandwidth_As(d.mh(), total_alignments) * 1e-6 << " |" << std::endl;
   std::cout << "|----------------------------------------+------------+------------------+--------------------------|" << std::endl;
   std::cout << "| Total execution time:                  | " << std::setw(10) << d.total() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(d.total(), data_size) << " | ";
-  std::cout << std::setw(24) << bandwidth_As(d.total(), total_alignments) << " |" << std::endl;
+  std::cout << std::setw(24) << bandwidth_As(d.total(), total_alignments) * 1e-6 << " |" << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
   std::cout << std::endl;
   std::cout << "=====================================================================================================" << std::endl;
   std::cout << "| Reference:                             | " << std::setw(10) << r.msm() << " | ";
   std::cout << std::setw(16) << bandwidth_MBs(r.msm(), data_size) << " | ";
-  std::cout << std::setw(24) << bandwidth_As(r.msm(), total_alignments) << " |" << std::endl;
+  std::cout << std::setw(24) << bandwidth_As(r.msm(), total_alignments) * 1e-6 << " |" << std::endl;
   std::cout << "|----------------------------------------+------------+------------------+--------------------------|" << std::endl;
   std::cout << "| Speed up (excluding pcie transfer):    | ";
   std::cout << std::setw(56) << r.msm()/d.msm() << " |" << std::endl;;
@@ -152,9 +152,9 @@ void print_timing_data(timing_data d, timing_data r, double data_size, unsigned 
 
 void write_to_csv(std::string filename, const timing_data &d) {
   std::ofstream outputFile(filename);
-  outputFile << "plf,scaling" << std::endl;
+  outputFile << "preparation,plf,scaling" << std::endl;
   for (unsigned int call = 0; call < d.num_blocks; call++) {
-    outputFile << d.hm(call) << "," << d.mh(call) << std::endl;
+    outputFile << d.hm(call) << "," << d.msm(call) << "," << d.mh(call) << std::endl;
   }
   outputFile.close();
 }

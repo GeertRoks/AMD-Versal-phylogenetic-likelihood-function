@@ -4,13 +4,14 @@
 #include "include.h"
 #include "timing.h"
 #include "data.h"
+#include <experimental/xrt_queue.h>
 
 #include <random>
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 3)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments>\n");
+  if(argc != 6)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used> <window size>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
@@ -21,10 +22,30 @@ int main(int argc, char* argv[]) {
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(alignment sites) out of range" << std::endl;
   }
-  tb.plf_calls = 100;
-  tb.window_size = 1024;
-  tb.combined_ev = 1;
-  tb.parallel_instances = 1;
+  try {
+    tb.plf_calls = std::stoul(argv[3]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for plf_calls: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(plf calls) out of range" << std::endl;
+  }
+  try {
+    tb.parallel_instances = std::stoul(argv[4]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid number for parallel_instances: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(instances used) out of range" << std::endl;
+  }
+  // TODO: make window size automatically detected from xclbin name
+  try {
+    tb.window_size = std::stoul(argv[5]);
+  } catch (const std::invalid_argument& ia) {
+    std::cerr << "Invalid window size: " << ia.what() << std::endl;
+  } catch (const std::out_of_range& oor) {
+    std::cerr << "Argument(window size) out of range" << std::endl;
+  }
+  tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
+  tb.aie_type = acap.classifyAieType(acap.get_pl_name());
 
   std::cout << std::left << std::endl;
   std::cout << "====================================================================================" << std::endl;
@@ -56,9 +77,9 @@ int main(int argc, char* argv[]) {
   //Init//////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Create HLS kernel handles
-  xrt::kernel* mm2sleft_kernels = new xrt::kernel[tb.parallel_instances];
-  xrt::kernel* mm2sright_kernels = new xrt::kernel[tb.parallel_instances];
-  xrt::kernel* s2mm_kernels = new xrt::kernel[tb.parallel_instances];
+  xrt::kernel mm2sleft_kernels[tb.parallel_instances];
+  xrt::kernel mm2sright_kernels[tb.parallel_instances];
+  xrt::kernel s2mm_kernels[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     mm2sleft_kernels[i] = xrt::kernel(*acap.get_device(), *acap.get_uuid(), kernel_name("mm2sleft", i));
     mm2sright_kernels[i] = xrt::kernel(*acap.get_device(), *acap.get_uuid(), kernel_name("mm2sright", i));
@@ -67,9 +88,9 @@ int main(int argc, char* argv[]) {
   printf("\nconnected to datamover kernels\n");
 
   // Create the HLS kernel run handles and set the parameters
-  xrt::run* mm2sleft_run = new xrt::run[tb.parallel_instances];
-  xrt::run* mm2sright_run = new xrt::run[tb.parallel_instances];
-  xrt::run* s2mm_run = new xrt::run[tb.parallel_instances];
+  xrt::run mm2sleft_run[tb.parallel_instances];
+  xrt::run mm2sright_run[tb.parallel_instances];
+  xrt::run s2mm_run[tb.parallel_instances];
   for (unsigned int i = 0; i < tb.parallel_instances; i++) {
     mm2sleft_run[i] = xrt::run(mm2sleft_kernels[i]);
     mm2sleft_run[i].set_arg(0, tb.alignments_per_instance());
@@ -101,9 +122,18 @@ int main(int argc, char* argv[]) {
 
 
   //Run///////////////////////////////////////////////////////////////////////////////////////////////////
+  std::cout << "Setup data gathering structures ... " << std::endl << std::endl;
+  xrt::queue main_queue[tb.parallel_instances];
+  xrt::queue right_queue[tb.parallel_instances];
+  xrt::queue output_queue[tb.parallel_instances];
+  xrt::queue::event right_done[tb.parallel_instances];
+  xrt::queue::event out_done[tb.parallel_instances];
+  xrt::queue::event instance_done[tb.parallel_instances];
+
   auto xrt_profile = xrt::profile::user_range("roundtrip_exec_time", "The execution time of the full test");
   Timer t;
-  timing_data execution_ms(tb.plf_calls);
+  timing_data execution_ms;
+  execution_ms.init(tb.plf_calls);
 
 
   std::cout << "Start PLF calculation on accelerator ... " << std::endl;
@@ -114,15 +144,21 @@ int main(int argc, char* argv[]) {
 
     execution_ms.t1[i] = t.elapsed();
 
+    // Execute PLF calculation parallelized on Versal
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      s2mm_run[k].start();
-      mm2sleft_run[k].start();
-      mm2sright_run[k].start();
+
+      // execute acceleration platform
+      main_queue[k].enqueue([&mm2sleft_run, k] {mm2sleft_run[k].start(); mm2sleft_run[k].wait();});
+      right_done[k] = right_queue[k].enqueue([&mm2sright_run, k] {mm2sright_run[k].start(); mm2sright_run[k].wait();});
+      out_done[k] = output_queue[k].enqueue([&s2mm_run, k] {s2mm_run[k].start(); s2mm_run[k].wait();});
+      main_queue[k].enqueue(right_done[k]);
+      instance_done[k] = main_queue[k].enqueue(out_done[k]);
+
     }
+
+    // Sync all threads
     for (unsigned int k = 0; k < tb.parallel_instances; k++) {
-      mm2sleft_run[k].wait();
-      mm2sright_run[k].wait();
-      s2mm_run[k].wait();
+      instance_done[k].wait();
     }
 
     execution_ms.t2[i] = t.elapsed();
@@ -134,7 +170,8 @@ int main(int argc, char* argv[]) {
 
   //Result//////////////////////////////////////////////////////////////////////////////////////////////////
 
-  timing_data reference_ms(tb.plf_calls);
+  timing_data reference_ms;
+  reference_ms.init(tb.plf_calls);
   std::cout << std::endl;
   print_timing_data(execution_ms, reference_ms, (double) tb.data_size(), tb.alignment_sites * tb.plf_calls, tb.plf_calls);
 
@@ -146,19 +183,22 @@ int main(int argc, char* argv[]) {
 
   //Cleanup////////////////////////////////////////////////////////////////////////////////////////////////
 
+  execution_ms.destroy();
+  reference_ms.destroy();
+
   std::cout << "delete handles" << std::endl;
-  delete[] mm2sleft_kernels;
-  delete[] mm2sright_kernels;
-  delete[] s2mm_kernels;
-  delete[] mm2sleft_run;
-  delete[] mm2sright_run;
-  delete[] s2mm_run;
-  mm2sleft_kernels = nullptr;
-  mm2sright_kernels = nullptr;
-  s2mm_kernels = nullptr;
-  mm2sleft_run = nullptr;
-  mm2sright_run = nullptr;
-  s2mm_run = nullptr;
+  //delete[] mm2sleft_kernels;
+  //delete[] mm2sright_kernels;
+  //delete[] s2mm_kernels;
+  //delete[] mm2sleft_run;
+  //delete[] mm2sright_run;
+  //delete[] s2mm_run;
+  //mm2sleft_kernels = nullptr;
+  //mm2sright_kernels = nullptr;
+  //s2mm_kernels = nullptr;
+  //mm2sleft_run = nullptr;
+  //mm2sright_run = nullptr;
+  //s2mm_run = nullptr;
 
   return 0;
 }
