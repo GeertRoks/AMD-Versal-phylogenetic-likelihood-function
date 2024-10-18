@@ -33,6 +33,12 @@ public:
 
       adf::connect< adf::window<window_data_size>   >(k_EV[i].out[0], out[i]);
 
+      unsigned int idx_c = i>1?2:0;
+      unsigned int idx_r = 4*(i%2);
+      adf::location<adf::kernel>(k_mmul_right[i]) = adf::tile(start_col + idx_c    , start_row + idx_r + 1);
+      adf::location<adf::kernel>(k_mmul_left[i])  = adf::tile(start_col + idx_c    , start_row + idx_r + 3);
+      adf::location<adf::kernel>(k_combine[i])    = adf::tile(start_col + idx_c + 1, start_row + idx_r + 2);
+      adf::location<adf::kernel>(k_EV[i])         = adf::tile(start_col + idx_c + 1, start_row + idx_r  +1);
       //adf::location<adf::kernel>(k_mmul_left[i]) = adf::tile(start_col + i, start_row);
       //adf::location<adf::stack>(k_mmul_left[i]) = adf::bank(start_col + i, start_row, 2);
       //adf::location<adf::buffer>(k_mmul_left[i].in[0]) = adf::location<adf::kernel>(k_mmul_left[i]);
