@@ -176,7 +176,8 @@ run_hw_pcie:
 	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
 
 ALIGNMENTS ?= 100
-ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
+#ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
+ALIGNMENT_SITES ?= 10000 50000 100000 500000 1000000 5000000 10000000 50000000 100000000 500000000 1000000000
 PLF_CALLS ?= 1
 INSTANCES_USED ?= 1
 #TODO: read window size from xclbin instead of separate input parameter
@@ -282,8 +283,8 @@ $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 	# Preferering to use 'v++ -c --mode aie' instead of aiecompiler, because it seems that aiecompiler is getting phased out. Also, aiecompiler has no option to place log files in a specific directory, which will clutter the workspace
 	# Using the --aie_legacy flag to enable the use of aiecompiler flags using v++. Needed because the -o flag of v++ has no effect on libadf.a, so --ouput-archive of aiecompiler is used.
 	# If this is fixed in a later version of v++, then remove the --aie_legacy flag and replace the --ouput-archive flag with -o
-	v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
-	#aiecompiler --target $* --platform $(PLATFORM) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/kernels" -I "$(DIR_AIE)" --workdir=$(@D)/Work $< --output-archive $@
+	#v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
+	aiecompiler --target $* --platform $(PLATFORM) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --workdir=$(@D)/Work_$(AIE) $< --output-archive $@
 
 #####################################################################################################
 # XSA

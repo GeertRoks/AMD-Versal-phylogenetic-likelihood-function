@@ -1,15 +1,6 @@
 #! /bin/bash
 
-echo "Have you commented the lines in the xrt.ini file?"
-read -p "Enter 'y' for yes or 'n' for no: " choice
-
-case "$choice" in
-    [Yy]* ) echo "Good we can continue then";;
-    [Nn]* ) echo "Please do so, if there is configuration in the xrt.ini, then the gen-pl test will not work"; exit 1;;
-    * ) echo "Invalid input. Please enter 'y' or 'n'."; exit 1;
-esac
-
-calls=200
+calls=5
 
 mkdir data_hw_pl_generator_runs
 
@@ -51,4 +42,3 @@ make run_hw_gen_tests TARGET=hw PL=genwindow1inEV AIE=128x4PLFwindow1inEV16288 P
 
 mv data_hw_pl_generator_runs data_gen_v4-300
 
-echo "remember to uncomment the xrt.ini file again afterwards"
