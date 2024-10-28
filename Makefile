@@ -15,10 +15,8 @@
 PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 WORKSPACE := PLF
 
-AIE ?= 128x9PLFwindow1inEV16288
-PL ?= uint128x4window1inEV
-
-PL_TYPE := $(patsubst uint128x4%,%,$(PL))
+AIE ?= 128x9DNAwindow16288Comb
+PL ?= memwindowComb
 
 PL_FREQ := 400
 
@@ -52,7 +50,7 @@ VPP_PACKAGE_DEPS := $(XSA) $(AIE_LIBADF)
 NUM_AIE_IO := $(shell echo $(AIE) | sed -n 's/.*x\([0-9]*\).*/\1/p')
 
 
-define VPP_CONNECTION_FLAGS_1_INPUT
+define VPP_CONNECTION_FLAGS_HALF_COMBINED
 --connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
@@ -62,7 +60,7 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
-define VPP_CONNECTION_FLAGS_1_INPUT_EV
+define VPP_CONNECTION_FLAGS_COMBINED
 --connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
@@ -71,7 +69,7 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --connectivity.sc ai_engine_0.plio_out_$${i}_$${j}:s2mm_$$i.s$$j"; done; done)
 endef
 
-define VPP_CONNECTION_FLAGS_2_INPUTS
+define VPP_CONNECTION_FLAGS_SEPARATE
 --connectivity.nk mm2sleft:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sleft_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk mm2sright:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "mm2sright_$$i,"; done | sed 's/,$$//') \
 --connectivity.nk s2mm:$(1):$(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n "s2mm_$$i,"; done | sed 's/,$$//') \
@@ -83,26 +81,28 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
-ifeq ($(PL_TYPE),window2in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
-else ifeq ($(PL_TYPE),window1in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
-else ifeq ($(PL_TYPE),window1inEV)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
-else ifeq ($(PL_TYPE),stream2in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
-else ifeq ($(PL_TYPE),stream1in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT,$(NUM_AIE_IO))
-else ifeq ($(PL_TYPE),stream1inEV)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
-else ifeq ($(PL),genwindow1inEV)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
-else ifeq ($(PL),genstream1inEV)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_1_INPUT_EV,$(NUM_AIE_IO))
-else ifeq ($(PL),genwindow2in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
-else ifeq ($(PL),genstream2in)
-	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_2_INPUTS,$(NUM_AIE_IO))
+ifeq ($(PL),memwindowSep)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
+else ifeq ($(PL),memstreamSep)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
+else ifeq ($(PL),genwindowSep)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
+else ifeq ($(PL),genstreamSep)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
+
+else ifeq ($(PL),memwindowComb)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
+else ifeq ($(PL),memstreamComb)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
+else ifeq ($(PL),genwindowComb)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
+else ifeq ($(PL),genstreamComb)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
+
+else ifeq ($(PL),memwindow1in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_HALF_COMBINED,$(NUM_AIE_IO))
+else ifeq ($(PL),memstream1in)
+	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_HALF_COMBINED,$(NUM_AIE_IO))
 endif
 
 #v++ flags
@@ -134,11 +134,6 @@ endif
 ifdef NO_INTERMEDIATE_RESULTS
 	GCC_HOST_FLAGS += -DNO_INTERMEDIATE_RESULTS=$(NO_INTERMEDIATE_RESULTS)
 endif
-
-ifdef BLOCKS
-	GCC_HOST_FLAGS += -DBLOCKS=$(BLOCKS)
-endif
-
 
 
 ifeq ($(strip ${XILINX_XRT}),)

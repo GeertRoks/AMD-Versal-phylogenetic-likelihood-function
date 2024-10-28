@@ -25,32 +25,31 @@ The accelerator can be build for various targets and by default it builds and ru
 ## Project info
 The system  consists of four main parts: 1) an array of AI Engines, 2) programmable logic, 3) device memory, 4) host CPU. The host CPU runs a host program that controls the accelerator that is implemented on the AI Engines and programmable logic, as well as move input data over PCIe to the device memroy. On the programmable logic PL kernels are implemented that read from the device memory and send it to the AI Engines, where AIE kernels run and execute the PLF calculation. The output is received again by an output PL kernel on the programmable logic, which also scales the values when necessary. Eventually the output PL kernel writes the results back to the device memory, where it can be read back to the host program over PCIe.
 
-The matrix multiplication of the PLF are executed on the AI Engines. The calculations for one PLF accelerator are divided over many AIE kernels which are organized in a AIE graph. A top-level AIE graph can hold multiple accelerator graphs and also routes the communication between the programmable logic kernel and the accelerator graphs.
+The matrix multiplication of the PLF are executed on the AI Engines. The calculations for one PLF accelerator are divided over many AIE kernels which are organized in a AIE graph. A top-level AIE graph can hold multiple accelerator graphs and also routes the communication between the programmable logic kernel and the accelerator graphs. Currently the PLF is only implemented for DNA data.
 
 The following sections provide information about the details of this repository.
 
 #### File structure
 - `aie/`
     - `data/`: contains test data for [AIE simulation](#1.-aie-simulation)
-    - `src/`: contains source code for AI Engine kernels. Organized in directories, where each directory is a configuration indicated by the name:  
-    `<plio-width>x<graphs>PLF<aie-type><plio-layout><window-size>`
+    - `src/`: contains source code for AI Engine kernels. Organized in directories, where each directory is a configuration indicated by the name:
+    `<plio-width>x<graphs>DNA<aie-type><plio-layout>`
         - __plio-width__ is the bit width of the PLIO channels between the PL and the AIE graphs
         - __graphs__ is the number of accelerator graphs that are defined in the top graph
-        - __aie-type__ is the inter-AIE-kernel communication method used, either `window` or `stream`
-        - __plio-layout__ is the configuration of the input PLIO, either `2in` or `1inEV`
-        - __window-size__ is only used when the aie-type is set to window and defines how large the window is
+        - __aie-type__ is the inter-AIE-kernel communication method used, either `stream`, `window1024`, `window8192` or `window16384`. Where the value after the window indicates the window size in bytes
+        - __plio-layout__ is the configuration of the input PLIO, either `Sep` or `Comb`
 
 - `hls/`
     - `src/`: contains source code of HLS kernels using the naming scheme:  
-    `<kernel>_<mem/gen><aie-type><plio-layout>`
+    `<kernel>_<mem/gen>DNA<aie-type><plio-layout>`
         - for one accelerator instance we need all of the following three __kernels__:
             - __mm2sleft__ is the data mover from memory (mm) to (2) stream of the AIE array (s) for the left side of the PLF calculation
             - __mm2sright__ is the data mover from memory (mm) to (2) stream of the AIE array (s) for the right side of the PLF calculation
             - __s2mm__ is the datamover from stream of the AIE array (s) to (2) memory (mm) for the result of the PLF calculation, as well as scaling
         - there are also different hls kernel configurations that *need to be matched to the AIE configuration*:
-            - **mem/gen** are the two PL versions, where `gen` is a special PL kernel that does not read from memory, but generates test data to measure PL-AIE communication performance. So, generally choose `mem` for normal operation where the PL kernels read the input data from the memory of the VCK5000 card. (**TODO: rename 128x4uint to mem**)
-            - __aie-type__ the hls kernels need to provide the data differently depending on the inter-AIE-kernel communication method used, either `window` or `stream`
-            - __plio-layout__ is the configuration of the input PLIO to the AI Engines, either `2in` or `1inEV`
+            - **mem/gen** are the two PL versions, where `gen` is a special PL kernel that does not read from memory, but generates test data to measure PL-AIE communication performance. So, generally choose `mem` for normal operation where the PL kernels read the input data from the memory of the VCK5000 card.
+            - __aie-type__ the hls kernels need to provide the data differently depending on the inter-AIE-kernel communication method used, either `window` or `stream`. No window size needs to be indicated, the PL kernels manage that in run time
+            - __plio-layout__ is the configuration of the input PLIO to the AI Engines, either `Sep` or `Comb`
 
 - `app/`
     - `src/`: contains the code for the program that controls the PLF accelerator
@@ -74,9 +73,9 @@ Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be a
     - `hw_emu` - _CPU emulation of the accelerator functionality and timing details_
     - `hw` - _Full implemenation of the accelerator that runs on the Versal adaptive SoC_
 - `AIE`: select the AIE configuration. Use the same name as the [directory](#file-structure) that you want to use
-    - default: `128x9PLFwindow1inEV8192`
+    - default: `128x9DNAwindow8192Comb`
 - `PL`: select the programable logic HLS kernel configuration for the three kernels (match it with the AIE configuration). Use the same naming convention as described in the hls paragraph of the [file structure](#file-structure) section
-    - default: `128x4uintwindow1inEV`
+    - default: `memDNAwindowComb`
 - `PL_FREQ`: set the frequency of the programmable logic in MHz
 
 
@@ -176,7 +175,6 @@ make run_hw TARGET=hw <makefile options>
 - [Master thesis](https://essay.utwente.nl/103959/) (change to paper if/when published)
 
 ## Roadmap
-- [ ] change aie dirs to use `128x9PLFstreamComb` or `128x4PLFwindow1024Sep`
 - [ ] Implement protein-based PLF
 - [ ] Create a single input PL kernel and a single output PL kernel that divides the workload site-by-site over a variable amount of instances
 - [ ] Improve host-device PCIe data movements to always use all 8 lanes, instead of 2 lanes per accelerator.
