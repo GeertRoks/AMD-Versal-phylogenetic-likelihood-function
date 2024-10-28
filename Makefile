@@ -104,27 +104,27 @@ $(shell for i in $$(seq 0 $$(($(1)-1))); do for j in 0 1 2 3; do echo -n " --con
 $(shell for i in $$(seq 0 $$(($(1)-1))); do echo -n " --connectivity.sc mm2sleft_$$i.sEV:ai_engine_0.plio_in_EV_$$i"; done)
 endef
 
-ifeq ($(PL),memwindowSep)
+ifeq ($(PL),memDNAwindowSep)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
-else ifeq ($(PL),memstreamSep)
+else ifeq ($(PL),memDNAstreamSep)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
-else ifeq ($(PL),genwindowSep)
+else ifeq ($(PL),genDNAwindowSep)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
-else ifeq ($(PL),genstreamSep)
+else ifeq ($(PL),genDNAstreamSep)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_SEPARATE,$(NUM_AIE_IO))
 
-else ifeq ($(PL),memwindowComb)
+else ifeq ($(PL),memDNAwindowComb)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
-else ifeq ($(PL),memstreamComb)
+else ifeq ($(PL),memDNAstreamComb)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
-else ifeq ($(PL),genwindowComb)
+else ifeq ($(PL),genDNAwindowComb)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
-else ifeq ($(PL),genstreamComb)
+else ifeq ($(PL),genDNAstreamComb)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_COMBINED,$(NUM_AIE_IO))
 
-else ifeq ($(PL),memwindow1in)
+else ifeq ($(PL),memDNAwindow1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_HALF_COMBINED,$(NUM_AIE_IO))
-else ifeq ($(PL),memstream1in)
+else ifeq ($(PL),memDNAstream1in)
 	VPP_CONNECTION_FLAGS := $(call VPP_CONNECTION_FLAGS_HALF_COMBINED,$(NUM_AIE_IO))
 endif
 
@@ -204,11 +204,11 @@ DIR_EMU_LOGS := emulation
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
+		$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED); \
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
+	$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED)
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	@echo "Running hw_emu @ $(CURRENT_DATE_TIME)"
@@ -217,7 +217,7 @@ run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	export XCL_EMULATION_MODE=hw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/hw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
@@ -266,7 +266,7 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 #	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
 
 $(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe: $(DIR_HOST)/src/host_$(INPUT_SRC).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
-	#$(xrt_guard)
+	$(xrt_guard)
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 

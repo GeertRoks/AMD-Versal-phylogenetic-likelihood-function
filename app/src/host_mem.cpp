@@ -10,8 +10,8 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 6)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used> <window size>\n");
+  if(argc != 5)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used>\n");
 
   acap_info acap(argv[1]);
   testbench_info tb;
@@ -36,14 +36,6 @@ int main(int argc, char* argv[]) {
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(instances used) out of range" << std::endl;
   }
-  // TODO: make window size automatically detected from xclbin name
-  //try {
-  //  tb.window_size = std::stoul(argv[5]);
-  //} catch (const std::invalid_argument& ia) {
-  //  std::cerr << "Invalid window size: " << ia.what() << std::endl;
-  //} catch (const std::out_of_range& oor) {
-  //  std::cerr << "Argument(window size) out of range" << std::endl;
-  //}
   tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
   tb.aie_type = acap.classifyAieType(acap.get_pl_name());
@@ -239,7 +231,7 @@ int main(int argc, char* argv[]) {
     std::copy(ev,                ev+16,                                          dataLeftInput[k]      );
     std::copy(branchleft,        branchleft+64,                                  dataLeftInput[k] + 16 );
     std::copy(&alignmentsleft[alignment_offset], &alignmentsleft[alignment_offset + tb.alignmentelements_per_instance(k)], dataLeftInput[k] + 80 );
-    if (tb.input_layout == ONE_INEV) {
+    if (tb.input_layout == COMBINED) {
       std::copy(ev,                 ev+16,                                           dataRightInput[k]      );
       std::copy(branchright,        branchright+64,                                  dataRightInput[k] + 16 );
       std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 80 );
@@ -341,7 +333,7 @@ int main(int argc, char* argv[]) {
       std::copy(ev,                ev+16,                                          dataLeftInput[k]      );
       std::copy(branchleft,        branchleft+64,                                  dataLeftInput[k] + 16 );
       std::copy(&alignmentsleft[alignment_offset], &alignmentsleft[alignment_offset + tb.alignmentelements_per_instance(k)], dataLeftInput[k] + 80 );
-      if (tb.input_layout == ONE_INEV) {
+      if (tb.input_layout == COMBINED) {
         std::copy(ev,                 ev+16,                                           dataRightInput[k]      );
         std::copy(branchright,        branchright+64,                                  dataRightInput[k] + 16 );
         std::copy(&alignmentsright[alignment_offset], &alignmentsright[alignment_offset + tb.alignmentelements_per_instance(k)], dataRightInput[k] + 80 );
