@@ -16,7 +16,7 @@ PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_v
 WORKSPACE := PLF
 
 AIE ?= 128x9DNAwindow16288Comb
-PL ?= memwindowComb
+PL ?= memDNAwindowComb
 
 PL_FREQ := 400
 
@@ -30,9 +30,9 @@ else
 endif
 
 # Project source directories
-DIR_HOST := app_$(WORKSPACE)
-DIR_AIE := aie_$(WORKSPACE)
-DIR_HLS := hls_$(WORKSPACE)_datamovers
+DIR_HOST := app
+DIR_AIE := aie
+DIR_HLS := hls
 DIR_BUILD := build
 
 AIE_SRCS_MAIN := $(DIR_AIE)/src/$(AIE)/project.cpp
