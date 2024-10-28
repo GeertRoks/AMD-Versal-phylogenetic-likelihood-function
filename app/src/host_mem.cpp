@@ -37,16 +37,18 @@ int main(int argc, char* argv[]) {
     std::cerr << "Argument(instances used) out of range" << std::endl;
   }
   // TODO: make window size automatically detected from xclbin name
-  try {
-    tb.window_size = std::stoul(argv[5]);
-  } catch (const std::invalid_argument& ia) {
-    std::cerr << "Invalid window size: " << ia.what() << std::endl;
-  } catch (const std::out_of_range& oor) {
-    std::cerr << "Argument(window size) out of range" << std::endl;
-  }
+  //try {
+  //  tb.window_size = std::stoul(argv[5]);
+  //} catch (const std::invalid_argument& ia) {
+  //  std::cerr << "Invalid window size: " << ia.what() << std::endl;
+  //} catch (const std::out_of_range& oor) {
+  //  std::cerr << "Argument(window size) out of range" << std::endl;
+  //}
   tb.input_layout = acap.classifyLayoutType(acap.get_pl_name());
 
   tb.aie_type = acap.classifyAieType(acap.get_pl_name());
+
+  tb.window_size = acap.classifyWindowSize(acap.get_aie_name());
 
   std::cout << std::left << std::endl;
   std::cout << "====================================================================================" << std::endl;

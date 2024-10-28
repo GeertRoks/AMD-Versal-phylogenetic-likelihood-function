@@ -17,7 +17,7 @@
 
 #include "plf.h"
 
-typedef enum {ONE_INEV, TWO_IN} layout_t;
+typedef enum {COMBINED, SEPARATE} layout_t;
 typedef enum {STREAM, WINDOW} aie_t;
 
 
@@ -51,11 +51,27 @@ class acap_info {
     }
     layout_t classifyLayoutType(const std::string& str) {
       if (str.find("1inEV") != std::string::npos) {
-        return layout_t::ONE_INEV;
+        return layout_t::COMBINED;
       } else if (str.find("2in") != std::string::npos) {
-        return layout_t::TWO_IN;
+        return layout_t::SEPARATE;
       }
-      return layout_t::TWO_IN; // Default case
+      return layout_t::SEPARATE; // Default case
+    }
+    unsigned int classifyWindowSize(const std::string& input) {
+      static const std::regex pattern("window(\\d+)");
+
+      std::smatch match;
+      if (!std::regex_search(input, match, pattern)) {
+        throw std::runtime_error("Invalid input format");
+      }
+
+      try {
+        return std::stoi(match.str(1));
+      } catch (const std::invalid_argument& e) {
+        throw std::runtime_error("Invalid numeric value");
+      } catch (const std::out_of_range& e) {
+        throw std::runtime_error("Number too large");
+      }
     }
 
   private:
@@ -193,10 +209,10 @@ struct testbench_info {
   unsigned int instance_active_elements_right(unsigned int instance) {
     unsigned int result = this->alignmentelements_per_instance(instance);
     switch (input_layout) {
-      case TWO_IN:
+      case SEPARATE:
         result += 4*16;
         break;
-      case ONE_INEV:
+      case COMBINED:
         result += 5*16;
         break;
     }
@@ -208,10 +224,10 @@ struct testbench_info {
   unsigned int instance_elements_right() {
     unsigned int result = this->elements_per_instance();
     switch (input_layout) {
-      case TWO_IN:
+      case SEPARATE:
         result += 4*16;
         break;
-      case ONE_INEV:
+      case COMBINED:
         result += 5*16;
         break;
     }

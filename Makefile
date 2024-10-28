@@ -160,10 +160,10 @@ ifdef NO_INTERMEDIATE_RESULTS
 endif
 
 
-ifeq ($(strip ${XILINX_XRT}),)
-	@echo "ERROR: XRT is not defined. First run: 'source /opt/xilinx/xrt/setup.sh' or for UT 'module load xilinx/xrt' and then run this make recipe again."
-endif
-
+xrt_guard = @if [ -z "${XILINX_XRT}" ]; then \
+		echo "ERROR: XRT is not defined. First run: 'source /opt/xilinx/xrt/setup.sh' or for UT servers 'module load xilinx/xrt' and then run this make recipe again."; \
+		exit 1; \
+	fi
 dir_guard = @mkdir -p $(@D)
 log_output := 2>&1 | tee screen_output.txt
 
@@ -266,6 +266,7 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 #	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
 
 $(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe: $(DIR_HOST)/src/host_$(INPUT_SRC).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+	#$(xrt_guard)
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
