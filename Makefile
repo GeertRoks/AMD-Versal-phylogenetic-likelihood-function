@@ -12,12 +12,11 @@
 # BLOCKS:      <natural number> (default: 1)
 
 
-#PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
-PLATFORM := /home/s2716879/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
+PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
 WORKSPACE := PLF
 
-PL ?= uint128x4
-AIE ?= 128x1PLF
+AIE ?= 128x9PLFwindow1inEV16288
+PL ?= uint128x4window1inEV
 
 PL_TYPE := $(patsubst uint128x4%,%,$(PL))
 
