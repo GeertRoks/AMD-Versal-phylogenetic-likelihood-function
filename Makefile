@@ -7,22 +7,45 @@
 
 ## Parameters
 # TARGET:      <sw_emu, hw_emu, hw> (default: sw_emu)
-# PL:          <uint32, uint128, uint512, qdma32, qdma128, qdma512>
-# AIE:         <streams: (bitwidth)stream(vector operations)[for], windows: (bitwidth)window(windowsize)(vector operations)[for]>
-# BLOCKS:      <natural number> (default: 1)
 
+#####################################################################################################
+#RUNTIME PARAMETERS
 
-PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
-WORKSPACE := PLF
+ALIGNMENTS ?= 100
+ALIGNMENT_SITES ?= 10000 50000 100000 500000 1000000 5000000 10000000 50000000 100000000 500000000 1000000000
+PLF_CALLS ?= 1
+INSTANCES_USED ?= 1
 
-AIE ?= 128x9DNAwindow16288Comb
-PL ?= memDNAwindowComb
-
-PL_FREQ := 400
+#####################################################################################################
+#ACCELERATOR PARAMETERS
 
 # Targets: sw_emu, hw_emu, hw
 TARGET := sw_emu
 
+AIE_TYPE ?= window
+WINDOW_SIZE ?= 8192
+PLIO_LAYOUT ?= Comb
+NUM_ACCELERATORS ?= 9
+INPUT_SRC ?= mem
+STATES ?= DNA
+
+ifeq ($(AIE_TYPE), stream)
+	AIE_COMS_METHOD := $(AIE_TYPE)
+else
+	AIE_COMS_METHOD := $(AIE_TYPE)$(WINDOW_SIZE)
+endif
+AIE ?= 128x$(NUM_ACCELERATORS)$(STATES)$(AIE_COMS_METHOD)$(PLIO_LAYOUT)
+PL ?= $(INPUT_SRC)$(STATES)$(AIE_TYPE)$(PLIO_LAYOUT)
+
+PL_FREQ := 400
+
+#####################################################################################################
+
+PLATFORM := /opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm
+WORKSPACE := PLF
+
+# The libadf.a library needs to be build with x86sim target for sw_emu and functional simulation,
+# but with the hw build target for hw_emu, hw and hardware simulation
 ifeq ($(TARGET),sw_emu)
     AIE_TARGET := x86sim
 else
@@ -125,6 +148,7 @@ ifdef PL_FREQ
 	GCC_HOST_FLAGS += -DPL_FREQ=$(PL_FREQ)
 endif
 
+#HOST PROGRAM PARAMETERS
 ifdef NO_PRERUN_CHECK
 	GCC_HOST_FLAGS += -DNO_PRERUN_CHECK=$(NO_PRERUN_CHECK)
 endif
@@ -147,11 +171,11 @@ log_output := 2>&1 | tee screen_output.txt
 
 all: xclbin host
 
-host: $(DIR_BUILD)/$(TARGET)/host.exe
+host: $(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe
 
-host_gen: $(DIR_BUILD)/$(TARGET)/host_gen.exe
+#host_gen: $(DIR_BUILD)/$(TARGET)/host_gen.exe
 
-host_pcie: $(DIR_BUILD)/$(TARGET)/host_pcie.exe
+#host_pcie: $(DIR_BUILD)/$(TARGET)/host_pcie.exe
 
 xclbin: $(XCLBIN)
 
@@ -161,37 +185,30 @@ aie: $(AIE_LIBADF)
 
 hls: $(HLS_XO)
 
+run: run_$(TARGET)
+
+run_tests: run_$(TARGET)_tests
+
 #####################################################################################################
 CURRENT_DATE_TIME := $(shell date +%Y%m%d-%H%M%S)
 PROJECT_ROOT := $(shell pwd)
 DIR_EMU_LOGS := emulation
 
-run_hw_pcie:
-	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
+#run_hw_pcie:
+#	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
 
-ALIGNMENTS ?= 100
-#ALIGNMENT_SITES ?= 100 500 1000 5000 10000 50000 100000 500000 1000000 5000000 10000000
-ALIGNMENT_SITES ?= 10000 50000 100000 500000 1000000 5000000 10000000 50000000 100000000 500000000 1000000000
-PLF_CALLS ?= 1
-INSTANCES_USED ?= 1
-#TODO: read window size from xclbin instead of separate input parameter
-WINDOW_SIZE ?= 1024
-
-run_hw_gen:
-	$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
-
-run_hw_gen_tests:
-	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
-	done
-
-run_hw:
-	$(DIR_BUILD)/hw/host.exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
+#run_hw_gen_tests:
+#	for alignments in $(ALIGNMENT_SITES); do\
+#		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
+#	done
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
+		$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
 	done
+
+run_hw:
+	$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE)
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	@echo "Running hw_emu @ $(CURRENT_DATE_TIME)"
@@ -200,27 +217,7 @@ run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	export XCL_EMULATION_MODE=hw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/hw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN); \
-	cd -
-
-run_sw_emu_pcie: $(DIR_BUILD)/sw_emu/emconfig.json
-	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
-	@echo "Project root $(PROJECT_ROOT)"
-	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
-	export XCL_EMULATION_MODE=sw_emu; \
-	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
-	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_pcie.exe $(PROJECT_ROOT)/$(XCLBIN); \
-	cd -
-
-run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
-	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
-	@echo "Project root $(PROJECT_ROOT)"
-	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
-	export XCL_EMULATION_MODE=sw_emu; \
-	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
-	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN); \
 	cd -
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
@@ -230,8 +227,28 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host.exe $(PROJECT_ROOT)/$(XCLBIN) 203 $(PLF_CALLS) $(INSTANCES_USED); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
+
+#run_sw_emu_pcie: $(DIR_BUILD)/sw_emu/emconfig.json
+#	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
+#	@echo "Project root $(PROJECT_ROOT)"
+#	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
+#	export XCL_EMULATION_MODE=sw_emu; \
+#	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
+#	cd $(DIR_EMU_LOGS)/sw_emu; \
+#	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_pcie.exe $(PROJECT_ROOT)/$(XCLBIN); \
+#	cd -
+
+#run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
+#	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
+#	@echo "Project root $(PROJECT_ROOT)"
+#	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
+#	export XCL_EMULATION_MODE=sw_emu; \
+#	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
+#	cd $(DIR_EMU_LOGS)/sw_emu; \
+#	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
+#	cd -
 
 
 aie_sim: $(DIR_BUILD)/hw/aie/libadf_$(AIE).a
@@ -248,17 +265,17 @@ aie_x86sim: $(DIR_BUILD)/x86sim/aie/libadf_$(AIE).a
 #	$(dir_guard)
 #	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -c $@ $<
 
-$(DIR_BUILD)/$(TARGET)/host.exe: $(DIR_HOST)/src/host.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+$(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe: $(DIR_HOST)/src/host_$(INPUT_SRC).cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
-$(DIR_BUILD)/$(TARGET)/host_gen.exe: $(DIR_HOST)/src/host_gen.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
-	$(dir_guard)
-	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
-
-$(DIR_BUILD)/$(TARGET)/host_pcie.exe: $(DIR_HOST)/src/host_pcie.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
-	$(dir_guard)
-	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
+#$(DIR_BUILD)/$(TARGET)/host_gen.exe: $(DIR_HOST)/src/host_gen.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+#	$(dir_guard)
+#	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
+#
+#$(DIR_BUILD)/$(TARGET)/host_pcie.exe: $(DIR_HOST)/src/host_pcie.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
+#	$(dir_guard)
+#	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
 
 #####################################################################################################

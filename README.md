@@ -14,7 +14,7 @@ make xclbin host PLATFORM=<path/to/vck5000/platform/file.xpfm>
 
 When the compilation is done, we run the accelerator with the following command:
 ~~~
-make run_sw_emu PLATFORM=<path/to/vck5000/platform/file.xpfm>
+make run PLATFORM=<path/to/vck5000/platform/file.xpfm>
 ~~~
 
 The accelerator can be build for various targets and by default it builds and runs it for the *Software Emulation* target. This means that only a functional implementation of the accelerator runs on a Versal emulator on the CPU. Refer to the [Makefile options](#makefile-options) section to read more about the different build targets. Get the full performance using the *Hardware* target. Additionally, there are multiple configurations of the accelerator available which are described in the [Accelerator configurations](#accelerator-configurations) section.
@@ -25,11 +25,69 @@ The accelerator can be build for various targets and by default it builds and ru
 ## Project info
 The system  consists of four main parts: 1) an array of AI Engines, 2) programmable logic, 3) device memory, 4) host CPU. The host CPU runs a host program that controls the accelerator that is implemented on the AI Engines and programmable logic, as well as move input data over PCIe to the device memroy. On the programmable logic PL kernels are implemented that read from the device memory and send it to the AI Engines, where AIE kernels run and execute the PLF calculation. The output is received again by an output PL kernel on the programmable logic, which also scales the values when necessary. Eventually the output PL kernel writes the results back to the device memory, where it can be read back to the host program over PCIe.
 
-The matrix multiplication of the PLF are executed on the AI Engines. The calculations for one PLF accelerator are divided over many AIE kernels which are organized in a AIE graph. A top-level AIE graph can hold multiple accelerator graphs and also routes the communication between the programmable logic kernel and the accelerator graphs. Currently the PLF is only implemented for DNA data.
+The matrix multiplication of the PLF are executed on the AI Engines. The calculations for one PLF accelerator are divided over many AIE kernels which are organized in a AIE graph. A top-level AIE graph can hold multiple accelerator graphs and also routes the communication between the programmable logic kernel and the accelerator graphs.
 
 The following sections provide information about the details of this repository.
 
+#### Accelerator configurations
+The PLF can be implemented for various data and in various ways. The following shows the current configuration parameters.
+
+###### Type of data
+ Currently the PLF is only implemented for DNA data (4 states), but it could be implemented for any other type of date with more or fewer states.
+
+###### PLIO input layout
+TODO: add info (separate or combined)
+
+
+###### AI Engine inter-kernel communication method
+TODO: add info (stream or window)
+
+
+###### Data input source
+TODO: add info (mem or gen)
+
+#### Makefile options
+The following makefile variables can be used to control details of the accelerators
+
+***NOTE: Make sure that the `XILINX_XRT` bash environment variable is set.***  
+Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be able to compile the host program.So to load the XRT library use the setup script in the XRT install location `source /opt/xilinx/xrt/setup.sh`.
+
+###### Accelerator platform options
+- `PLATFORM`: point to the platform `.xpfm` file of the VCK5000
+    - default: `/opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm`
+- `TARGET`: select which compilation target is used. Also refer to the [AMD documentation UG1393](https://docs.amd.com/r/2022.2-English/ug1393-vitis-application-acceleration/Build-Targets) for more info on the different build targets.
+    - `sw_emu` - (default) _CPU emulation of only the accelerator functionality_
+    - `hw_emu` - _CPU emulation of the accelerator functionality and timing details_
+    - `hw` - _Full implemenation of the accelerator that runs on the Versal adaptive SoC_
+- `AIE_TYPE`: the AIE inter-kernel communication method, either `stream` or `window`
+- `WINDOW_SIZE`: the size of the window in bytes, ignored when `AIE_TYPE` is set to `stream` (default: 8192)
+- `PLIO_LAYOUT`: the PLIO input layout, either `Sep` for separate input layout or `Comb` for combined input layout (default: `Comb`)
+- `NUM_ACCELERATORS`: the number of accelerator instances to map onto the VCK5000 (default: `9`)
+- `INPUT_SRC`: source of the input data, either `mem` for the PL reading the input data from the device memory or `gen` for the PL generating random input data (default: `mem`)
+- `STATES`: the type of data (default: `DNA`)
+- `AIE`: directly select the AIE configuration. Use the same name as the [directory](#file-structure) that you want to use. If not set, then it uses the above options, otherwise it overwrites them
+    - default: `128x9DNAwindow8192Comb`
+- `PL`: directly select the programable logic HLS kernel configuration for the three kernels (match it with the AIE configuration). Use the same naming convention as described in the hls paragraph of the [file structure](#file-structure) section. If not set, then it uses the above options, otherwise it overwrites them
+    - default: `memDNAwindowComb`
+- `PL_FREQ`: set the frequency of the programmable logic in MHz
+
+
+###### Host program options
+- `NO_PRERUN_CHECKS`:  defaults to `0`, which will let the host program ask for confirmation of the provided input before accelerator execution. If set to `1` during compilation of host program, then no confirmation is asked before the execution of the accelerator.
+- `NO_INTERMEDIATE_RESULTS`: defaults to `0`, which will let the host program measure intermediate steps of the accelerator execution and report execution time of the individual steps. The steps are 1) data movement from host to device over PCIe, 2) plf execution, 3) data mvement back from device to host over PCIe. If this option is set to `1` during host program compilation, then only a total time is measured of the complete execution, which also removes a few synchronisation steps, giving slightly better performance.
+- `NO_CORRECTNESS_CHECK`: defaults to `0`, which will let the host program check the output of the accelerator against a known-good CPU implementation and check for corretness of the PLF implementation. If set to `1` during host program compilation, then this check is skipped, which reduces test time and host memory usage.
+
+
+###### Runtime options
+- `ALIGNMENTS`: the length of the conditional likelihood vector (CLV) to be used for the run current (default: 100)
+- `INSTANCES_USED`: number of accelerator instances to be used from the total defined by `NUM_ACCELERATORS` (default: 1)
+- `PLF_CALLS`: the number of repetitions for the same test to understand the variation (default: 1)
+- (`ALIGNMENT_SITES`: list containing all CLV lengths that need to be tested. I feel like this could be set from the command line, but I have not been able to do this, so it has to be edited in the Makefile itself)
+
+
+
 #### File structure
+The root folder of the project is called the *workspace*. This workspace contains at least the following directories where the Makefile will look for certain files
 - `aie/`
     - `data/`: contains test data for [AIE simulation](#1.-aie-simulation)
     - `src/`: contains source code for AI Engine kernels. Organized in directories, where each directory is a configuration indicated by the name:
@@ -58,41 +116,6 @@ The following sections provide information about the details of this repository.
             - number of alignment patterns
             - parallel accelerator instances used
             - window size (**TODO: set this variable automatically from the xclbin name**)
-
-#### Makefile options
-The following makefile variables can be used to control details of the accelerators
-
-***NOTE: Make sure that the `XILINX_XRT` bash environment variable is set.***  
-Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be able to compile the host program.So to load the XRT library use the setup script in the XRT install location `source /opt/xilinx/xrt/setup.sh`.
-
-###### Accelerator platform options
-- `PLATFORM`: point to the platform `.xpfm` file of the VCK5000
-    - default: `/opt/xilinx/platforms/xilinx_vck5000_gen4x8_qdma_2_202220_1/xilinx_vck5000_gen4x8_qdma_2_202220_1.xpfm`
-- `TARGET`: select which compilation target is used. Also refer to the [AMD documentation UG1393](https://docs.amd.com/r/2022.2-English/ug1393-vitis-application-acceleration/Build-Targets) for more info on the different build targets.
-    - `sw_emu` - (default) _CPU emulation of only the accelerator functionality_
-    - `hw_emu` - _CPU emulation of the accelerator functionality and timing details_
-    - `hw` - _Full implemenation of the accelerator that runs on the Versal adaptive SoC_
-- `AIE`: select the AIE configuration. Use the same name as the [directory](#file-structure) that you want to use
-    - default: `128x9DNAwindow8192Comb`
-- `PL`: select the programable logic HLS kernel configuration for the three kernels (match it with the AIE configuration). Use the same naming convention as described in the hls paragraph of the [file structure](#file-structure) section
-    - default: `memDNAwindowComb`
-- `PL_FREQ`: set the frequency of the programmable logic in MHz
-
-
-###### Host program options
-- `NO_PRERUN_CHECKS`:  defaults to `0`, which will let the host program ask for confirmation of the provided input before accelerator execution. If set to `1` during compilation of host program, then no confirmation is asked before the execution of the accelerator.
-- `NO_INTERMEDIATE_RESULTS`: defaults to `0`, which will let the host program measure intermediate steps of the accelerator execution and report execution time of the individual steps. The steps are 1) data movement from host to device over PCIe, 2) plf execution, 3) data mvement back from device to host over PCIe. If this option is set to `1` during host program compilation, then only a total time is measured of the complete execution, which also removes a few synchronisation steps, giving slightly better performance.
-- `NO_CORRECTNESS_CHECK`: defaults to `0`, which will let the host program check the output of the accelerator against a known-good CPU implementation and check for corretness of the PLF implementation. If set to `1` during host program compilation, then this check is skipped, which reduces test time and host memory usage.
-
-
-###### Runtime options
-- `ALIGNMENTS`: the length of the conditional likelihood vector (CLV) to be used for the run current (default: 100)
-- `INSTANCES_USED`: the number of accelerator instances to be used for this run (default: 1)
-- `PLF_CALLS`: the number of repetitions for the same test to understand the variation (default: 1)
-- `WINDOW_SIZE`: the size of the window (if used), needs to be matched with accelerator platform configuration (default: 1024) (**TODO: set this variable automatically using the name of the xclbin**)
-- (`ALIGNMENT_SITES`: list containing all CLV lengths that need to be tested. I feel like this could be set from the command line, but I have not been able to do this, so it has to be edited in the Makefile itself)
-
-
 
 ## Development
 
@@ -133,7 +156,7 @@ make host TARGET=sw_emu <makefile options>
 
 Run the system in an emulator on your CPU using:
 ```
-make run_sw_emu TARGET=sw_emu <makefile options>
+make run TARGET=sw_emu <makefile options>
 ```
 
 ###### 3b. Hardware emulation
@@ -145,7 +168,7 @@ make host TARGET=hw_emu <makefile options>
 
 Run the system in an emulator on your CPU using:
 ```
-make run_hw_emu TARGET=hw_emu <makefile options>
+make run TARGET=hw_emu <makefile options>
 ```
 
 ###### 4. Hardware
@@ -157,7 +180,7 @@ make host TARGET=hw <makefile options>
 
 Run the system on the Versal hardware using:
 ```
-make run_hw TARGET=hw <makefile options>
+make run TARGET=hw <makefile options>
 ```
 
 ## Resources
