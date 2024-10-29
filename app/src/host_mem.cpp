@@ -10,27 +10,27 @@
 
 int main(int argc, char* argv[]) {
 
-  if(argc != 5)
-    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <number of alignments> <number of plf calls> <parallel instances used>\n");
+  if(argc != 6)
+    throw std::runtime_error(std::string("Not correct amount of parameters provided. Usage: ") + argv[0] + " </path/to/a.xclbin> <device user BDF> <number of alignments> <number of plf calls> <parallel instances used>\n");
 
-  acap_info acap(argv[1]);
+  acap_info acap(argv[1], argv[2]);
   testbench_info tb;
   try {
-    tb.alignment_sites = std::stoul(argv[2]);
+    tb.alignment_sites = std::stoul(argv[3]);
   } catch (const std::invalid_argument& ia) {
     std::cerr << "Invalid number for alignment_sites: " << ia.what() << std::endl;
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(alignment sites) out of range" << std::endl;
   }
   try {
-    tb.plf_calls = std::stoul(argv[3]);
+    tb.plf_calls = std::stoul(argv[4]);
   } catch (const std::invalid_argument& ia) {
     std::cerr << "Invalid number for plf_calls: " << ia.what() << std::endl;
   } catch (const std::out_of_range& oor) {
     std::cerr << "Argument(plf calls) out of range" << std::endl;
   }
   try {
-    tb.parallel_instances = std::stoul(argv[4]);
+    tb.parallel_instances = std::stoul(argv[5]);
   } catch (const std::invalid_argument& ia) {
     std::cerr << "Invalid number for parallel_instances: " << ia.what() << std::endl;
   } catch (const std::out_of_range& oor) {

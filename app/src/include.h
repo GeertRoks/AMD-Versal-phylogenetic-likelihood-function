@@ -27,11 +27,11 @@ unsigned int findNumAieIOInXclbin(const std::string& input);
 
 class acap_info {
   public:
-    acap_info(char* filename) {
+    acap_info(char* filename, char* device_user_BDF) {
       this->xclbinFile = filename;
       set_xclbin();
       set_target();
-      set_device();
+      set_device(device_user_BDF);
       load_xclbin();
     }
     std::string get_target() { return this->target; }
@@ -89,11 +89,12 @@ class acap_info {
       this->xclbin = xrt::xclbin(this->xclbinFile);
       this->kernels = this->xclbin.get_kernels();
     }
-    void set_device() {
+    void set_device(char* device_user_BDF) {
       if (this->target == "sw_emu" || this->target == "hw_emu") {
         this->device = xrt::device(0);
       } else if (this->target == "hw") {
-        this->device = xrt::device("0000:5e:00.1");
+        std::string bdf(device_user_BDF);
+        this->device = xrt::device(bdf);
       }
       if(this->device == nullptr) {
         throw std::runtime_error("No valid device handle found. Run `xbutil examine` and look for the correct BDF.\n If xbutil is not found, then source the xrt setup file: `source /opt/xilinx/xrt/setup.sh`\n");

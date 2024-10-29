@@ -11,6 +11,7 @@
 #####################################################################################################
 #RUNTIME PARAMETERS
 
+DEVICE ?= 0000:5e:00.1
 ALIGNMENTS ?= 100
 ALIGNMENT_SITES ?= 10000 50000 100000 500000 1000000 5000000 10000000 50000000 100000000 500000000 1000000000
 PLF_CALLS ?= 1
@@ -204,11 +205,11 @@ DIR_EMU_LOGS := emulation
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
-		$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED); \
+		$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(DEVICE) $$alignments $(PLF_CALLS) $(INSTANCES_USED); \
 	done
 
 run_hw:
-	$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED)
+	$(DIR_BUILD)/hw/host_$(INPUT_SRC).exe $(XCLBIN) $(DEVICE) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED)
 
 run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	@echo "Running hw_emu @ $(CURRENT_DATE_TIME)"
@@ -217,7 +218,7 @@ run_hw_emu: $(DIR_BUILD)/hw_emu/emconfig.json
 	export XCL_EMULATION_MODE=hw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/hw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/hw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(DEVICE) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
 
 run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
@@ -227,7 +228,7 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	export XCL_EMULATION_MODE=sw_emu; \
 	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
 	cd $(DIR_EMU_LOGS)/sw_emu; \
-	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
+	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(DEVICE) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
 
 #run_sw_emu_pcie: $(DIR_BUILD)/sw_emu/emconfig.json

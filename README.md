@@ -79,6 +79,7 @@ Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be a
 
 
 ###### Runtime options
+- `DEVICE`: the user BDF of the device you want to use (can be found using `xbutil examine`), (default: `0000:5e:00.1`)
 - `ALIGNMENTS`: the length of the conditional likelihood vector (CLV) to be used for the run current (default: 100)
 - `INSTANCES_USED`: number of accelerator instances to be used from the total defined by `NUM_ACCELERATORS` (default: 1)
 - `PLF_CALLS`: the number of repetitions for the same test to understand the variation (default: 1)
