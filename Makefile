@@ -37,7 +37,7 @@ endif
 AIE ?= 128x$(NUM_ACCELERATORS)$(STATES)$(AIE_COMS_METHOD)$(PLIO_LAYOUT)
 PL ?= $(INPUT_SRC)$(STATES)$(AIE_TYPE)$(PLIO_LAYOUT)
 
-PL_FREQ := 400
+PL_FREQ := 250
 
 #####################################################################################################
 

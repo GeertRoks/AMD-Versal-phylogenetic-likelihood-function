@@ -59,7 +59,7 @@ Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be a
     - `sw_emu` - (default) _CPU emulation of only the accelerator functionality_
     - `hw_emu` - _CPU emulation of the accelerator functionality and timing details_
     - `hw` - _Full implemenation of the accelerator that runs on the Versal adaptive SoC_
-- `AIE_TYPE`: the AIE inter-kernel communication method, either `stream` or `window`
+- `AIE_TYPE`: the AIE inter-kernel communication method, either `stream` or `window` (default: `window`)
 - `WINDOW_SIZE`: the size of the window in bytes, ignored when `AIE_TYPE` is set to `stream` (default: 8192)
 - `PLIO_LAYOUT`: the PLIO input layout, either `Sep` for separate input layout or `Comb` for combined input layout (default: `Comb`)
 - `NUM_ACCELERATORS`: the number of accelerator instances to map onto the VCK5000 (default: `9`)
@@ -69,7 +69,7 @@ Check using `echo $XILINX_XRT`. If it is not set then the makefile will not be a
     - default: `128x9DNAwindow8192Comb`
 - `PL`: directly select the programable logic HLS kernel configuration for the three kernels (match it with the AIE configuration). Use the same naming convention as described in the hls paragraph of the [file structure](#file-structure) section. If not set, then it uses the above options, otherwise it overwrites them
     - default: `memDNAwindowComb`
-- `PL_FREQ`: set the frequency of the programmable logic in MHz
+- `PL_FREQ`: set the frequency of the programmable logic in MHz (default: 250MHz)
 
 
 ###### Host program options
