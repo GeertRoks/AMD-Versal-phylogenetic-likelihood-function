@@ -202,6 +202,7 @@ make run TARGET=hw <makefile options>
 - [ ] Implement protein-based PLF
 - [ ] Create a single input PL kernel and a single output PL kernel that divides the workload site-by-site over a variable amount of instances
 - [ ] Improve host-device PCIe data movements to always use all 8 lanes, instead of 2 lanes per accelerator.
+- [ ] Run host program on Versal ARM cpu (bare metal or PetaLinux) -> if completed then use Run-Time Parameters to update branch and EV matrices
 
 ## License
 This software is licensed under the GNU General Public License version 3.0 (GPL-3) as it is based on the PLF implementation of [RAxML](https://github.com/stamatak/standard-RAxML).
