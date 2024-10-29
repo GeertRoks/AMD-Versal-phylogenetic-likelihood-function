@@ -174,10 +174,6 @@ all: xclbin host
 
 host: $(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe
 
-#host_gen: $(DIR_BUILD)/$(TARGET)/host_gen.exe
-
-#host_pcie: $(DIR_BUILD)/$(TARGET)/host_pcie.exe
-
 xclbin: $(XCLBIN)
 
 xsa: $(XSA)
@@ -194,14 +190,6 @@ run_tests: run_$(TARGET)_tests
 CURRENT_DATE_TIME := $(shell date +%Y%m%d-%H%M%S)
 PROJECT_ROOT := $(shell pwd)
 DIR_EMU_LOGS := emulation
-
-#run_hw_pcie:
-#	$(DIR_BUILD)/hw/host_pcie.exe $(XCLBIN)
-
-#run_hw_gen_tests:
-#	for alignments in $(ALIGNMENT_SITES); do\
-#		$(DIR_BUILD)/hw/host_gen.exe $(XCLBIN) $$alignments $(PLF_CALLS) $(INSTANCES_USED) $(WINDOW_SIZE); \
-#	done
 
 run_hw_tests:
 	for alignments in $(ALIGNMENT_SITES); do\
@@ -231,27 +219,6 @@ run_sw_emu: $(DIR_BUILD)/sw_emu/emconfig.json
 	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_$(INPUT_SRC).exe $(PROJECT_ROOT)/$(XCLBIN) $(DEVICE) $(ALIGNMENTS) $(PLF_CALLS) $(INSTANCES_USED); \
 	cd -
 
-#run_sw_emu_pcie: $(DIR_BUILD)/sw_emu/emconfig.json
-#	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
-#	@echo "Project root $(PROJECT_ROOT)"
-#	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
-#	export XCL_EMULATION_MODE=sw_emu; \
-#	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
-#	cd $(DIR_EMU_LOGS)/sw_emu; \
-#	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_pcie.exe $(PROJECT_ROOT)/$(XCLBIN); \
-#	cd -
-
-#run_sw_emu_gen: $(DIR_BUILD)/sw_emu/emconfig.json
-#	@echo "Running sw_emu @ $(CURRENT_DATE_TIME)"
-#	@echo "Project root $(PROJECT_ROOT)"
-#	@mkdir -p $(DIR_EMU_LOGS)/sw_emu
-#	export XCL_EMULATION_MODE=sw_emu; \
-#	export XRT_INI_PATH=$(shell pwd)/xrt.ini; \
-#	cd $(DIR_EMU_LOGS)/sw_emu; \
-#	$(PROJECT_ROOT)/$(DIR_BUILD)/sw_emu/host_gen.exe $(PROJECT_ROOT)/$(XCLBIN) 100; \
-#	cd -
-
-
 aie_sim: $(DIR_BUILD)/hw/aie/libadf_$(AIE).a
 	rm -r $(DIR_BUILD)/aiesimulator_output
 	aiesimulator --pkg-dir=$(<D)/Work_$(AIE) --input-dir=$(DIR_AIE) --output-dir=$(DIR_BUILD)/aiesimulator_output --profile --dump-vcd=foo --output-time-stamp=no
@@ -271,15 +238,6 @@ $(DIR_BUILD)/$(TARGET)/host_$(INPUT_SRC).exe: $(DIR_HOST)/src/host_$(INPUT_SRC).
 	$(dir_guard)
 	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
 
-#$(DIR_BUILD)/$(TARGET)/host_gen.exe: $(DIR_HOST)/src/host_gen.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
-#	$(dir_guard)
-#	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
-#
-#$(DIR_BUILD)/$(TARGET)/host_pcie.exe: $(DIR_HOST)/src/host_pcie.cpp $(DIR_HOST)/src/plf.cpp $(DIR_HOST)/src/utils.cpp
-#	$(dir_guard)
-#	$(CXX) $(GCC_HOST_FLAGS) $(GCC_HOST_INCLUDES) -o $@ $^ $(GCC_HOST_LIBS)
-
-
 #####################################################################################################
 # XCLBIN
 
@@ -293,10 +251,11 @@ $(XCLBIN): $(VPP_PACKAGE_DEPS)
 $(DIR_BUILD)/%/aie/libadf_$(AIE).a: $(AIE_SRCS_MAIN) $(AIE_SRCS_OTHER)
 	$(dir_guard)
 	# For v++ version 2022.2:
-	# Preferering to use 'v++ -c --mode aie' instead of aiecompiler, because it seems that aiecompiler is getting phased out. Also, aiecompiler has no option to place log files in a specific directory, which will clutter the workspace
 	# Using the --aie_legacy flag to enable the use of aiecompiler flags using v++. Needed because the -o flag of v++ has no effect on libadf.a, so --ouput-archive of aiecompiler is used.
 	# If this is fixed in a later version of v++, then remove the --aie_legacy flag and replace the --ouput-archive flag with -o
 	#v++ -c --mode aie --target $* --platform $(PLATFORM) $(VPP_AIE_FLAGS) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --log_dir $(@D)/logs_$(AIE) --work_dir=$(@D)/Work_$(AIE) $< --aie_legacy --output-archive $@
+
+	# libadf.a compiled with v++ are currently not able to be analyzed using vitis_analyzer, whereas the aiecompiler does: vitis_analyzer build/<target>/aie/Work_<configuration>/project.aiecompiler_summary
 	aiecompiler --target $* --platform $(PLATFORM) -I "${XILINX_VITIS}/aietools/include" -I "$(DIR_AIE)/src/$(AIE)" -I "$(DIR_AIE)/data" -I "$(DIR_AIE)/src/$(AIE)/kernels" -I "$(DIR_AIE)" --workdir=$(@D)/Work_$(AIE) $< --output-archive $@
 
 #####################################################################################################
